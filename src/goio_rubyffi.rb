@@ -1,31 +1,51 @@
 #!/usr/bin/env ruby
 #
-# Ruby FFI interface to the Vernier GoIO sensor interface products
+# goio_rubyffi.rb: simple Ruby FFI interface to the Vernier GoIO sensor interface products
+#
+# Stephen Bannasch, 2010 08 20
+# Copyright 2009-2010 by the Concord Consortium.
+# Released under the same license as Ruby: http://www.ruby-lang.org/en/LICENSE.txt
 #
 # http://www.vernier.com/go/
 # http://www.vernier.com/downloads/gosdk.html
 #
-# Tested with jruby 1.5.1 on MacOS X 10.6.4.
+# Tested with the following Ruby VMs on MacOS X 10.6.4:
 #
-# First build libGoIO_DLL.dylib with xcode.
+#   Ruby 1.8.7 (pre-installed on MacOS X 10.6.4)
+#   Ruby 1.9.2 installed with rvm
+#   JRuby 1.5.1 installed with rvm
+#
+# Previously tested on MacOS X 10.5.8 and Ruby 1.8.6.
+# Not yet tested on Windows.
+# 
+# The Ruby gem 'ffi' is a prerequisite. This is built into JRuby and Rubinius.
+#
+# To run this program from the working directory created when checking out the 
+# GoIO_SDK git repository hosted here: http://github.com/concord-consortium/goio_sdk
+# You will first need to build libGoIO_DLL.dylib with xcode.
 #
 # For now if you are running on MacOS 10.6 you will need to build libGoIO_DLL.dylib
-# using the xcode project in the xcode_3_2_macosx_10_6 branch of this git repository.
+# using the xcode project in the 'xcode_3_2_macosx_10_6' branch of this repository.
 # 
-# Install jruby easily by first installing rvm and then running:
+# Install jruby or MRI Ruby 1.9.2 easily by first installing rvm http://rvm.beginrescueend.com/
+# and then running:
 #
 #   rvm install jruby
-#
-# To run this prohram in jruby:
-#
 #   rvm use jruby
+#
+#   rvm install 1.9.2
+#   rvm use 1.9.2
+#   gem install ffi
+#
+# To run this program in ruby:
+#
 #   ruby goio_rubyffi.rb
 #
 # On MacOS X 10.6 jruby runs in 64-bit Java 1.6 so this will require 
 # libGoIO_DLL.dylib to include a 64-bit architecture (x86_64).
 #
-# For example this shows that the libGoIO_DLL.dylib is compiled as
-# a three-way universal artifact:
+# For example this shows that the libGoIO_DLL.dylib in my working directory
+# on Mac OS X 10.6.4 is compiled as a three-way universal artifact:
 #
 #   file ./GoIO_DLL/MacOSX/build/Development/libGoIO_DLL.dylib
 #   ./GoIO_DLL/MacOSX/build/Development/libGoIO_DLL.dylib: Mach-O universal binary with 3 architectures
