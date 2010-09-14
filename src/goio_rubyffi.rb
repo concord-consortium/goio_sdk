@@ -81,6 +81,7 @@ require 'ffi'
 
 module GoIO
   extend FFI::Library
+  # ffi_lib '../macos-libs//libGoIO_DLL_x86_64.dylib'
   ffi_lib 'GoIO_DLL/MacOSX/build/Deployment/libGoIO_DLL.dylib'
 
   GOIO_MAX_SIZE_DEVICE_NAME           = 255
