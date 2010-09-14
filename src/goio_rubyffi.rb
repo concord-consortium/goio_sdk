@@ -2,7 +2,7 @@
 #
 # goio_rubyffi.rb: simple Ruby FFI interface to the Vernier GoIO sensor interface products
 #
-# Stephen Bannasch, 2010 08 20
+# Stephen Bannasch, 2010 09 14
 # Copyright 2009-2010 by the Concord Consortium.
 # Released under the same license as Ruby: http://www.ruby-lang.org/en/LICENSE.txt
 #
