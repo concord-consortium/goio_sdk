@@ -79,10 +79,35 @@
 require 'rubygems'
 require 'ffi'
 
+JRUBY = (defined?(RUBY_ENGINE) and RUBY_ENGINE =~ /(java|jruby)/)
+if JRUBY
+  require "java"
+  import java.lang.System
+  os_arch = System.getProperty("os.arch")  # x86_64 or i386
+  data_model = System.getProperty('sun.arch.data.model')
+  if data_model
+    ARCH_SIZE = data_model.to_i
+  else
+    ARCH_SIZE = os_arch[/64/] ? 64 : 32
+  end
+else
+  ARCH_SIZE = ((1<<32).class == Fixnum) ? 64 : 32
+end
+
 module GoIO
   extend FFI::Library
+  # ffi_lib 'GoIO_DLL/MacOSX/build/Development/libGoIO_DLL.dylib'
   # ffi_lib '../macos-libs//libGoIO_DLL_x86_64.dylib'
-  ffi_lib 'GoIO_DLL/MacOSX/build/Deployment/libGoIO_DLL.dylib'
+  if ARCH_SIZE == 32
+    puts "\nUsing: libGoIO_DLL.dylib\n\n"
+    ffi_lib '../macos-libs//libGoIO_DLL.dylib'
+    # 'GoIO_DLL/MacOSX/build/Deployment/libGoIO_DLL.dylib'
+  else
+    puts "\nUsing: x86_64/libGoIO_DLL.dylib\n\n"
+    ffi_lib 'GoIO_DLL/MacOSX/build/Deployment/libGoIO_DLL.dylib'
+    # 'GoIO_DLL/MacOSX/build/Deployment/libGoIO_DLL_x86_64.dylib'
+  end
+    
 
   GOIO_MAX_SIZE_DEVICE_NAME           = 255
   GOIO_MAX_BUFFER_DEVICE_NAME         = GOIO_MAX_SIZE_DEVICE_NAME+1
