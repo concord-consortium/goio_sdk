@@ -159,7 +159,7 @@ bool GUtils::OSConvertShortToBytes(short nInNum, unsigned char * pLSB, unsigned 
 {
 	if(!pLSB || !pMSB)
 		return false;
-#if TARGET_CPU_X86
+#if TARGET_RT_LITTLE_ENDIAN
 	unsigned char * pNum = (unsigned char *) &nInNum;
 	*pLSB = *pNum;
 	pNum++;
@@ -178,7 +178,7 @@ bool GUtils::OSConvertBytesToShort(char chLSB, char chMSB, short * pOutShort)
 	if(!pOutShort)
 		return false;
 		
-#if TARGET_CPU_X86
+#if TARGET_RT_LITTLE_ENDIAN
 	char * pAssign = (char *) pOutShort;
 	*pAssign = chLSB;
 	pAssign++;
@@ -206,7 +206,7 @@ bool GUtils::OSConvertIntToBytes(int nInNum,
 	// If this assert ever hits, this routine should be revised - pack
 	// additional high-sig bytes with zeros
 	
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	unsigned char * pNum = (unsigned char *) &nInNum;
 	*pLSB = *pNum;
 	pNum++;
@@ -243,7 +243,7 @@ bool GUtils::OSConvertBytesToInt(unsigned char chLSB,
 	// If this assert ever hits, this routine should be revised - pack
 	// additional high-sig bytes with zeros
 
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	char * pAssign = (char *) pOutInt;
 	*pAssign = chLSB;
 	pAssign++;
@@ -278,7 +278,7 @@ bool GUtils::OSConvertFloatToBytes(float fInNum,
 	if(!GSTD_ASSERT(sizeof(float) == 4))
 		return false;
 	
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	unsigned char * pNum = (unsigned char *) &fInNum;
 	*pLSB = *pNum;
 	pNum++;
@@ -314,7 +314,7 @@ bool GUtils::OSConvertBytesToFloat(unsigned char chLSB,
 		
 	// If this assert ever hits, this routine should be revised - pack
 	// additional high-sig bytes with zeros
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	char * pAssign = (char *) pOutFloat;
 	*pAssign = chLSB;
 	pAssign++;
@@ -338,7 +338,7 @@ bool GUtils::OSConvertBytesToFloat(unsigned char chLSB,
 
 int	GUtils::OSConvertIntelIntToPlatformInt(int nSourceInt)
 {
-#if TARGET_CPU_X86
+#if TARGET_RT_LITTLE_ENDIAN
 	return nSourceInt;
 #else
 	int nDestInt;
@@ -355,7 +355,7 @@ int	GUtils::OSConvertIntelIntToPlatformInt(int nSourceInt)
 
 int	GUtils::OSConvertMacIntToPlatformInt(int nSourceInt)
 {
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	int nDestInt;
 	char *pSourceInt = (char *) &nSourceInt;
 	char *pDestInt = (char *) &nDestInt;

@@ -3049,7 +3049,7 @@ void local_ConvertBytesToInt(unsigned char chLSB,
 				unsigned char chMSB,
 				int * pOutInt)
 {
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	char * pAssign = (char *) pOutInt;
 	*pAssign = chLSB;
 	pAssign++;
@@ -3073,7 +3073,7 @@ void local_ConvertBytesToInt(unsigned char chLSB,
 
 void local_ConvertByteToShort(unsigned char chLSB, unsigned char chMSB, short* pOutShort)
 {
-#if TARGET_CPU_X86
+#if TARGET_RT_LITTLE_ENDIAN
 	char * pAssign = (char *) pOutShort;
 	*pAssign = chLSB;
 	pAssign++;
