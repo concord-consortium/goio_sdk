@@ -21,7 +21,7 @@
 #define WIDEN(x) GTextUtils::ConvertNarrowStringToWide(x)
 
 #ifdef TARGET_OS_MAC
-	#if TARGET_CPU_X86
+	#if TARGET_CPU_X86 || TARGET_CPU_X86_64
 		#include <cmath>
 	#else
 		#include <math.h>
@@ -179,7 +179,7 @@ public:
 #endif
 
 #ifdef TARGET_OS_MAC
-	#if TARGET_CPU_X86
+	#if TARGET_CPU_X86 || TARGET_CPU_X86_64
 		static bool			OSIsValidNumber(real fVal) { return (!std::isnan(fVal) && std::isfinite(fVal)); } // RETURN true if fVal is OK
 	#else 
 		static bool			OSIsValidNumber(real fVal) { return (!__isnand(fVal) && __isfinited(fVal)); } // RETURN true if fVal is OK

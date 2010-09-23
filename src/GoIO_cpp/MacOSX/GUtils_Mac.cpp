@@ -278,7 +278,7 @@ bool GUtils::OSConvertFloatToBytes(float fInNum,
 	if(!GSTD_ASSERT(sizeof(float) == 4))
 		return false;
 	
-#if TARGET_RT_LITTLE_ENDIAN	
+#if __LITTLE_ENDIAN__	
 	unsigned char * pNum = (unsigned char *) &fInNum;
 	*pLSB = *pNum;
 	pNum++;
