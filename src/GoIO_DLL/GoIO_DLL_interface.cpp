@@ -453,7 +453,7 @@ GOIO_DLL_INTERFACE_DECL GOIO_SENSOR_HANDLE GoIO_Sensor_Open(
 	//First find out if this device is already open.
 	CGoIOSensor *pNewSensor = NULL;
 	GPortRef newPortRef(kPortType_USB, pDeviceName, pDeviceName, vendorId, productId);
-	long nResult = 0;
+	int nResult = 0;
 	GSensorDDSRec DDSRec;
 	long nBytesRead;
 
@@ -481,9 +481,9 @@ GOIO_DLL_INTERFACE_DECL GOIO_SENSOR_HANDLE GoIO_Sensor_Open(
 	if (0 == nResult)
     {
         GCyclopsInitParams initParams;
-        long initParamsSize = 0;
+        int initParamsSize = 0;
         void *pInitParams = NULL;
-		long timeoutMs = SKIP_TIMEOUT_MS_DEFAULT;
+		int timeoutMs = SKIP_TIMEOUT_MS_DEFAULT;
 		if (CYCLOPS_DEFAULT_PRODUCT_ID == productId)
 		{
 			memset(&initParams, 0, sizeof(initParams));
@@ -813,7 +813,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_SendCmdAndGetResponse(
 	else
 	{
 		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
-		GSTD_ASSERT(sizeof(gtype_int32) == sizeof(long));
+		// GSTD_ASSERT(sizeof(gtype_int32) == sizeof(long));
 		nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(cmd, pParams, nParamBytes, pRespBuf, (long *) pnRespBytes, timeoutMs);
 
 		UnlockSensor(hSensor);
@@ -882,7 +882,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_GetNextResponse(
 	else
 	{
 		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
-		GSTD_ASSERT(sizeof(gtype_int32) == sizeof(long));
+		// GSTD_ASSERT(sizeof(gtype_int32) == sizeof(long));
 		bool errRespFlag = false;
 		nResult = pGoIOSensor->m_pInterface->GetNextResponse(pRespBuf, (long *) pnRespBytes, pCmd, &errRespFlag, nTimeoutMs);
 		if (0 == nResult)
@@ -1640,7 +1640,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_GetSensorNumber(
 			//Send command to the sensor.
 			GSkipGetSensorIdCmdResponsePayload getSensorIdResponsePayload;
 			long nBytesRead = sizeof(GSkipGetSensorIdCmdResponsePayload);
-			long nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(SKIP_CMD_ID_GET_SENSOR_ID, NULL, 0, 
+			int nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(SKIP_CMD_ID_GET_SENSOR_ID, NULL, 0, 
 				&getSensorIdResponsePayload, &nBytesRead, timeoutMs);
 			if (0 == nResult)
 			{
