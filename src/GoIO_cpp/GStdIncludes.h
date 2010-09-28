@@ -114,7 +114,9 @@ namespace std {
 
 // arrgh - the compiler particulars got us, we have to introduce
 // namespace std here...
-using namespace std;
+
+/*MSVC10  -- build fails if:*/
+//using namespace std;
 
 // STANDARD CROSS-PLATFORM CONSTANT:
 // note that you will need to be in namespace std to use kPI:

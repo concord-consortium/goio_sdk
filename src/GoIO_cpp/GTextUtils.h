@@ -75,7 +75,7 @@ public:
 	static cppstring				ConvertToUppercase(const cppstring &sInString);
 	static bool						StringsEqualIgnoringCase(const cppstring &s1, const cppstring &s2);
 	
-	static EImportTextFormat		ParseImportFormat(ifstream * pInStream);
+	static EImportTextFormat		ParseImportFormat(std::ifstream * pInStream);
 	static int						GetWordsPerLine(std::stringstream * pInStream);
 	static cppstring				StripPathAndExtension(const cppstring &sFileAndPath);
 	static cppstring				StripPath(const cppstring &sFileAndPath);

@@ -11,7 +11,7 @@
 #undef THIS_FILE
 static char THIS_FILE[] = __FILE__;
 #endif
-
+using namespace std;
 real GSkipBaseDevice::kVoltsPerBit_ProbeTypeAnalog5V = 2.5/0x8000;
 real GSkipBaseDevice::kVoltsOffset_ProbeTypeAnalog5V = 2.5;
 real GSkipBaseDevice::kVoltsPerBit_ProbeTypeAnalog10V = 10.0/0x8000;

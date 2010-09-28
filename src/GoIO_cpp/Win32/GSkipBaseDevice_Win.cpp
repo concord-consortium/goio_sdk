@@ -456,7 +456,7 @@ void CWinSkipMgr::AddMeasurementPacket(GSkipPacket *pRec)
 		if (testCounter != pMeasRec->nRollingCounter)
 		{
 			cppsstream ss;
-			ss << endl << "Skip measurement rolling counter error - expected " << ((unsigned short) testCounter) << ", got " << ((unsigned short) pMeasRec->nRollingCounter) << endl;
+			ss << std::endl << "Skip measurement rolling counter error - expected " << ((unsigned short) testCounter) << ", got " << ((unsigned short) pMeasRec->nRollingCounter) << std::endl;
 			GSTD_TRACE(ss.str());
 			ss.str(GSTD_S(""));
 			ss << "Max delta time(ms) between AddMeasurementPacket() calls is " << m_maxDeltaTimeMs;

@@ -18,7 +18,8 @@
 static char THIS_FILE[] = __FILE__;
 #endif 
 
-using namespace std;
+/*MSVC10 fails if:*/
+//using namespace std;
 
 int GTextUtils::kSmallestFontSize = 8;	// used in font size controls
 int GTextUtils::kLargestFontSize = 72;
@@ -428,10 +429,10 @@ bool GTextUtils::IsNarrowStringLong(const narrowstring & sNumber,	// string to t
 	// so, if they are different, then sNumber is not a number!
 	long nValue0 = 0;
 	long nValue1 = 1;
-	stringstream ss0;
+	std::stringstream ss0;
 	ss0 << sNumber;
 	ss0 >> nValue0;
-	stringstream ss1;
+	std::stringstream ss1;
 	ss1 << sNumber;
 	ss1 >> nValue1;
 	if (nValue0 == nValue1)
