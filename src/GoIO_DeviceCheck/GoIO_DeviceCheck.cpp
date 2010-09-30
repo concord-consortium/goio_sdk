@@ -6,6 +6,9 @@
 #include <memory.h>
 
 #ifdef TARGET_OS_WIN
+
+#pragma warning (disable : 4996)  /*MSVC --COMPLAINS about sprintf*/
+
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
 #include <windows.h>
 #endif
