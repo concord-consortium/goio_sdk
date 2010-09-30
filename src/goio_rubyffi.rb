@@ -99,14 +99,12 @@ module GoIO
   # ffi_lib 'GoIO_DLL/MacOSX/build/Development/libGoIO_DLL.dylib'
   # ffi_lib '../macos-libs//libGoIO_DLL_x86_64.dylib'
   if ARCH_SIZE == 32
-    puts "\nUsing: libGoIO_DLL.dylib\n\n"
-    ffi_lib '../macos-libs//libGoIO_DLL.dylib'
-    # 'GoIO_DLL/MacOSX/build/Deployment/libGoIO_DLL.dylib'
+    lib_path = '../dll/macosx/i386/libGoIO_DLL.dylib'
   else
-    puts "\nUsing: x86_64/libGoIO_DLL.dylib\n\n"
-    ffi_lib 'GoIO_DLL/MacOSX/build/Deployment/libGoIO_DLL.dylib'
-    # 'GoIO_DLL/MacOSX/build/Deployment/libGoIO_DLL_x86_64.dylib'
+    lib_path = '../dll/macosx/x86_64/libGoIO_DLL.dylib'
   end
+  puts "\nUsing: #{lib_path}\n\n"
+  ffi_lib lib_path
     
 
   GOIO_MAX_SIZE_DEVICE_NAME           = 255
