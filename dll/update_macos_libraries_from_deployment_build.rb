@@ -14,7 +14,7 @@ end
 `cp #{deployment_build_path}/libGoIO_DLL.* #{artifact_copy_path}`
 
 %w{ppc7400 i386 x86_64}.each do |arch|
-  `lipo -extract #{arch} #{deployment_build_path}/#{dylib_name} -output #{artifact_copy_path}/#{dylib_name}`
+  `lipo -extract #{arch} #{deployment_build_path}/#{dylib_name} -output #{artifact_copy_path}/#{arch}/#{dylib_name}`
 end
 
 # replace the original macosx artifact dir with the temporary dir
