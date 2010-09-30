@@ -79,10 +79,33 @@
 require 'rubygems'
 require 'ffi'
 
+JRUBY = (defined?(RUBY_ENGINE) and RUBY_ENGINE =~ /(java|jruby)/)
+if JRUBY
+  require "java"
+  import java.lang.System
+  os_arch = System.getProperty("os.arch")  # x86_64 or i386
+  data_model = System.getProperty('sun.arch.data.model')
+  if data_model
+    ARCH_SIZE = data_model.to_i
+  else
+    ARCH_SIZE = os_arch[/64/] ? 64 : 32
+  end
+else
+  ARCH_SIZE = ((1<<32).class == Fixnum) ? 64 : 32
+end
+
 module GoIO
   extend FFI::Library
+  # ffi_lib 'GoIO_DLL/MacOSX/build/Development/libGoIO_DLL.dylib'
   # ffi_lib '../macos-libs//libGoIO_DLL_x86_64.dylib'
-  ffi_lib 'GoIO_DLL/MacOSX/build/Deployment/libGoIO_DLL.dylib'
+  if ARCH_SIZE == 32
+    lib_path = '../dll/macosx/i386/libGoIO_DLL.dylib'
+  else
+    lib_path = '../dll/macosx/x86_64/libGoIO_DLL.dylib'
+  end
+  puts "\nUsing: #{lib_path}\n\n"
+  ffi_lib lib_path
+    
 
   GOIO_MAX_SIZE_DEVICE_NAME           = 255
   GOIO_MAX_BUFFER_DEVICE_NAME         = GOIO_MAX_SIZE_DEVICE_NAME+1
@@ -178,66 +201,67 @@ def list_devices
 end
 
 def go_link
+  puts
   @product_id = GoIO::PRODUCT_IDS["GoLink"]
-  devices = GoIO.GoIO_UpdateListOfAvailableDevices(GoIO::VERNIER_DEFAULT_VENDOR_ID, @product_id)
+  @devices = GoIO.GoIO_UpdateListOfAvailableDevices(GoIO::VERNIER_DEFAULT_VENDOR_ID, @product_id)
+  @devices.times do |i|
+    @go_link_name = FFI::MemoryPointer.new(GoIO::GOIO_MAX_BUFFER_DEVICE_NAME)
+    status = GoIO.GoIO_GetNthAvailableDeviceName(@go_link_name, GoIO::GOIO_MAX_SIZE_DEVICE_NAME, GoIO::VERNIER_DEFAULT_VENDOR_ID, @product_id, i)
+    puts "GoLink found. Enumerated id: #{@go_link_name.get_string(0)}"
+    @h_device = GoIO::GoIO_Sensor_Open(@go_link_name, GoIO::VERNIER_DEFAULT_VENDOR_ID, @product_id, 0)
+    @char_id = FFI::MemoryPointer.new :uchar
+    GoIO::GoIO_Sensor_DDSMem_GetSensorNumber(@h_device, @char_id, 0, 0)
+    print "Sensor id: #{@char_id.get_uchar(0)}: "
   
-  @go_link_name = FFI::MemoryPointer.new(GoIO::GOIO_MAX_BUFFER_DEVICE_NAME)
-  status = GoIO.GoIO_GetNthAvailableDeviceName(@go_link_name, GoIO::GOIO_MAX_SIZE_DEVICE_NAME, GoIO::VERNIER_DEFAULT_VENDOR_ID, @product_id, 0)
-  puts "GoLink found. Enumerated id: #{@go_link_name.get_string(0)}"
-
-  @h_device = GoIO::GoIO_Sensor_Open(@go_link_name, GoIO::VERNIER_DEFAULT_VENDOR_ID, @product_id, 0)
+    @long_name = FFI::MemoryPointer.new(100)
+    GoIO::GoIO_Sensor_DDSMem_GetLongName(@h_device, @long_name, @long_name.size)
+    puts @long_name.get_string(0)
   
-  @char_id = FFI::MemoryPointer.new :uchar
-  GoIO::GoIO_Sensor_DDSMem_GetSensorNumber(@h_device, @char_id, 0, 0)
-  print "Sensor id: #{@char_id.get_uchar(0)}: "
+    # debugger
+    GoIO.GoIO_Sensor_SetMeasurementPeriod(@h_device, 0.040, GoIO::SKIP_TIMEOUT_MS_DEFAULT)  # 40 milliseconds measurement period.
+    GoIO.GoIO_Sensor_SendCmdAndGetResponse(@h_device, GoIO::SKIP_CMD_ID_START_MEASUREMENTS, nil, 0, nil, nil, GoIO::SKIP_TIMEOUT_MS_DEFAULT)
   
-  @long_name = FFI::MemoryPointer.new(100)
-  GoIO::GoIO_Sensor_DDSMem_GetLongName(@h_device, @long_name, @long_name.size)
-  puts @long_name.get_string(0)
+    sleep(1)
   
+    @raw_measurements     = FFI::MemoryPointer.new(:int, 100)
+    @volts                = FFI::MemoryPointer.new(:double, 100)
+    @cal_measurements     = []
   
-  GoIO.GoIO_Sensor_SetMeasurementPeriod(@h_device, 0.040, GoIO::SKIP_TIMEOUT_MS_DEFAULT)  # 40 milliseconds measurement period.
-  GoIO.GoIO_Sensor_SendCmdAndGetResponse(@h_device, GoIO::SKIP_CMD_ID_START_MEASUREMENTS, nil, 0, nil, nil, GoIO::SKIP_TIMEOUT_MS_DEFAULT)
+    @num_measurements = GoIO.GoIO_Sensor_ReadRawMeasurements(@h_device, @raw_measurements, 100)
+    puts "#{@num_measurements} measurements received after about 1 second."
   
-  sleep(1)
+    @ave_cal_measurement = 0.0
+    @num_measurements.times do |i|
+      @volts[i].write_float(GoIO.GoIO_Sensor_ConvertToVoltage(@h_device, @raw_measurements[i].read_int))
+      @cal_measurements[i] = GoIO.GoIO_Sensor_CalibrateData(@h_device, @volts[i].read_float)
+      @ave_cal_measurement += @cal_measurements[i]
+    end
   
-  @raw_measurements     = FFI::MemoryPointer.new(:int, 100)
-  @volts                = FFI::MemoryPointer.new(:double, 100)
-  @cal_measurements     = []
+    if @num_measurements > 1
+      @ave_cal_measurement = @ave_cal_measurement/@num_measurements
+    end
   
-  @num_measurements = GoIO.GoIO_Sensor_ReadRawMeasurements(@h_device, @raw_measurements, 100)
-  puts "#{@num_measurements} measurements received after about 1 second."
+    @equation_type = FFI::MemoryPointer.new :char
+    GoIO.GoIO_Sensor_DDSMem_GetCalibrationEquation(@h_device, @equation_type)
   
-  @ave_cal_measurement = 0.0
-  @num_measurements.times do |i|
-    @volts[i].write_float(GoIO.GoIO_Sensor_ConvertToVoltage(@h_device, @raw_measurements[i].read_int))
-    @cal_measurements[i] = GoIO.GoIO_Sensor_CalibrateData(@h_device, @volts[i].read_float)
-    @ave_cal_measurement += @cal_measurements[i]
+    print "Average measurement: "
+  
+    if @equation_type.get_char(0) != GoIO::K_EquationType_Linear
+      puts "#{@ave_cal_measurement} volts"
+    else
+      @a = FFI::MemoryPointer.new :int
+      @b = FFI::MemoryPointer.new :int
+      @c = FFI::MemoryPointer.new :int
+      @active_cal_page = FFI::MemoryPointer.new :uchar
+      @units = FFI::MemoryPointer.new(:char, 21)
+      GoIO.GoIO_Sensor_DDSMem_GetActiveCalPage(@h_device, @active_cal_page);
+      GoIO.GoIO_Sensor_DDSMem_GetCalPage(@h_device, @active_cal_page.get_char(0), @a, @b, @c, @units, 20)
+      puts "#{'%.3f' % @ave_cal_measurement} #{@units.get_string(0)}"
+      puts
+    end
+  
+    GoIO::GoIO_Sensor_Close(@h_device)
   end
-  
-  if @num_measurements > 1
-    @ave_cal_measurement = @ave_cal_measurement/@num_measurements
-  end
-  
-  @equation_type = FFI::MemoryPointer.new :char
-  GoIO.GoIO_Sensor_DDSMem_GetCalibrationEquation(@h_device, @equation_type)
-  
-  print "Average measurement: "
-  
-  if @equation_type.get_char(0) != GoIO::K_EquationType_Linear
-    puts "#{@ave_cal_measurement} volts"
-  else
-    @a = FFI::MemoryPointer.new :int
-    @b = FFI::MemoryPointer.new :int
-    @c = FFI::MemoryPointer.new :int
-    @active_cal_page = FFI::MemoryPointer.new :uchar
-    @units = FFI::MemoryPointer.new(:char, 21)
-    GoIO.GoIO_Sensor_DDSMem_GetActiveCalPage(@h_device, @active_cal_page);
-    GoIO.GoIO_Sensor_DDSMem_GetCalPage(@h_device, @active_cal_page.get_char(0), @a, @b, @c, @units, 20)
-    puts "#{'%.3f' % @ave_cal_measurement} #{@units.get_string(0)}"
-  end
-  
-  GoIO::GoIO_Sensor_Close(@h_device)
 end
 
 def goio_close
