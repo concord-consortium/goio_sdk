@@ -6,7 +6,7 @@
 *~.nib
 
 build/
-
+Release/
 *.pbxuser
 *.perspective
 *.perspectivev3
