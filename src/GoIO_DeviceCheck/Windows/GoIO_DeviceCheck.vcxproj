@@ -67,11 +67,13 @@
     <OutDir>.\Release\x86\</OutDir>
     <IntDir>.\Release\intermediate</IntDir>
     <LinkIncremental>false</LinkIncremental>
+    <ExtensionsToDeleteOnClean>*.cdf;*.cache;*.obj;*.ilk;*.resources;*.tlb;*.tli;*.tlh;*.tmp;*.rsp;*.pgc;*.pgd;*.meta;*.tlog;*.manifest;*.res;*.pch;*.exp;*.idb;*.rep;*.xdc;*.pdb;*_manifest.rc;*.bsc;*.sbr;*.xml</ExtensionsToDeleteOnClean>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>.\Release\x64</OutDir>
     <IntDir>.\Release\intermediate</IntDir>
     <LinkIncremental>false</LinkIncremental>
+    <ExtensionsToDeleteOnClean>*.cdf;*.cache;*.obj;*.ilk;*.resources;*.tlb;*.tli;*.tlh;*.tmp;*.rsp;*.pgc;*.pgd;*.meta;*.tlog;*.manifest;*.res;*.pch;*.exp;*.idb;*.rep;*.xdc;*.pdb;*_manifest.rc;*.bsc;*.sbr;*.xml</ExtensionsToDeleteOnClean>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>.\Debug\x86\</OutDir>
@@ -116,11 +118,11 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <SubSystem>Console</SubSystem>
       <OutputFile>.\Release\x86\GoIO_DeviceCheck.exe</OutputFile>
-      <AdditionalLibraryDirectories>..\..\GoIO_DLL\Win32\Release\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\GoIO_DLL\Windows\Release\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>odbc32.lib;odbccp32.lib;GoIO_DLL.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if $(ConfigurationName) == Release xcopy /y "..\..\GoIO_DLL\Win32\Release\x86\GoIO_DLL.dll" $(ProjectDir)$(OutDir)</Command>
+      <Command>if $(ConfigurationName) == Release xcopy /y "..\..\GoIO_DLL\Windows\Release\x86\GoIO_DLL.dll" $(ProjectDir)$(OutDir)</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>copy dll resources</Message>
@@ -159,11 +161,11 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <SubSystem>Console</SubSystem>
       <OutputFile>.\Release\x64\GoIO_DeviceCheck.exe</OutputFile>
-      <AdditionalLibraryDirectories>..\..\..\redist\GoIO_DLL\win32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\GoIO_DLL\Windows\Release\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>odbc32.lib;odbccp32.lib;GoIO_DLL.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if $(ConfigurationName) == Release xcopy /y "..\..\GoIO_DLL\Win32\Release\x64\GoIO_DLL.dll" $(ProjectDir)$(OutDir)</Command>
+      <Command>if $(ConfigurationName) == Release xcopy /y "..\..\GoIO_DLL\Windows\Release\x64\GoIO_DLL.dll" $(ProjectDir)$(OutDir)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -254,8 +256,8 @@
     <CustomBuild Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\GoIO_DLL\Win32\GoIO_DLL.vcxproj">
-      <Project>{3817baf7-a283-fa0d-1ec2-ca8be6ab5bc3}</Project>
+    <ProjectReference Include="..\..\GoIO_DLL\Windows\GoIO_DLL.vcxproj">
+      <Project>{be8fa91b-f796-2797-c2ce-503fb8cdae9f}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
