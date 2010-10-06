@@ -99,6 +99,10 @@ int main(int argc, char* argv[])
 			}
 			printf("Average measurement = %8.3f %s .\n", averageCalbMeasurement, units);
 
+#ifdef TARGET_OS_WIN
+			getchar();
+#endif
+
 			GoIO_Sensor_Close(hDevice);
 		}
 	}
