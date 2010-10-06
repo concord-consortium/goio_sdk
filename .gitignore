@@ -17,7 +17,6 @@ Release/
 
 #Visual Studio files
 *.obj
-*.exe
 *.pdb
 *.user
 *.aps
