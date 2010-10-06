@@ -1,10 +1,10 @@
 #!/usr/bin/env ruby
 require 'fileutils'
 
-goio_dll_include_path = File.expand_path('../../src/GoIO_DLL',  __FILE__)
-goio_cpp_include_path = File.expand_path('../../src/GoIO_cpp',  __FILE__)
-include_copy_path = File.expand_path('../include2',  __FILE__)
-include_path = File.expand_path('../include',  __FILE__)
+goio_dll_include_path = File.expand_path('../src/GoIO_DLL',  __FILE__)
+goio_cpp_include_path = File.expand_path('../src/GoIO_cpp',  __FILE__)
+include_copy_path = File.expand_path('../../include2',  __FILE__)
+include_path = File.expand_path('../../dll/include',  __FILE__)
 
 # delete and populate a temporary directory
 `rm -rf #{include_copy_path}`
