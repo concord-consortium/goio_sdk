@@ -6,6 +6,9 @@
 #include <memory.h>
 
 #ifdef TARGET_OS_WIN
+
+#pragma warning (disable : 4996)  /*MSVC --COMPLAINS about sprintf*/
+
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
 #include <windows.h>
 #endif
@@ -95,6 +98,10 @@ int main(int argc, char* argv[])
 				GoIO_Sensor_DDSMem_GetCalPage(hDevice, activeCalPage, &a, &b, &c, units, sizeof(units));
 			}
 			printf("Average measurement = %8.3f %s .\n", averageCalbMeasurement, units);
+
+#ifdef TARGET_OS_WIN
+			getchar();
+#endif
 
 			GoIO_Sensor_Close(hDevice);
 		}

@@ -39,4 +39,6 @@
 //{{AFX_INSERT_LOCATION}}
 // Microsoft Visual C++ will insert additional declarations immediately before the previous line.
 
+#pragma warning (disable : 4996)  /*MSVC --COMPLAINS about sprintf*/
+
 #endif // !defined(AFX_STDAFX_H__D2BFFAC8_59BB_4125_B211_C1637EC7A522__INCLUDED_)

@@ -6,7 +6,7 @@
 #import "GSkipBaseDevice.h"
 #import "GTextUtils.h"
 #import "GUtils.h"
-
+using namespace std;
 long local_ReadPackets(GSkipBaseDevice *pDevice, void * pBuffer, long * pIONumPackets, long nBufferSizeInPackets, int nPipe);
 long local_PacketsAvailable(GSkipBaseDevice *pDevice, int nPipe);
 long local_ClearPacketQueue(GSkipBaseDevice *pDevice, int nPipe);

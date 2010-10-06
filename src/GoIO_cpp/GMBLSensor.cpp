@@ -26,7 +26,7 @@
 #undef THIS_FILE
 static char THIS_FILE[] = __FILE__;
 #endif
-
+using namespace std;
 GMBLSensor::GMBLSensor(void)
 {
 	memset(&m_sensorDDSRec, 0, sizeof(m_sensorDDSRec));

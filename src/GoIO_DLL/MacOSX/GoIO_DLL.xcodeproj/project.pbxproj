@@ -662,8 +662,8 @@
 			buildSettings = {
 				ARCHS = (
 					x86_64,
-					i386,
 					ppc,
+					i386,
 				);
 				COPY_PHASE_STRIP = NO;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -679,8 +679,6 @@
 				INSTALL_PATH = "@executable_path";
 				LIBRARY_STYLE = DYNAMIC;
 				MACH_O_TYPE = mh_dylib;
-				MACOSX_DEPLOYMENT_TARGET = 10.4;
-				ONLY_ACTIVE_ARCH = NO;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = (
 					"-seg1addr",
@@ -703,8 +701,8 @@
 			buildSettings = {
 				ARCHS = (
 					x86_64,
-					i386,
 					ppc,
+					i386,
 				);
 				COPY_PHASE_STRIP = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -716,7 +714,6 @@
 				INSTALL_PATH = "@executable_path";
 				LIBRARY_STYLE = DYNAMIC;
 				MACH_O_TYPE = mh_dylib;
-				MACOSX_DEPLOYMENT_TARGET = 10.4;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = (
 					"-seg1addr",
@@ -739,8 +736,8 @@
 			buildSettings = {
 				ARCHS = (
 					x86_64,
-					i386,
 					ppc,
+					i386,
 				);
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 2.11;
@@ -750,7 +747,6 @@
 				INSTALL_PATH = "@executable_path";
 				LIBRARY_STYLE = DYNAMIC;
 				MACH_O_TYPE = mh_dylib;
-				MACOSX_DEPLOYMENT_TARGET = 10.4;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = (
 					"-seg1addr",
@@ -790,7 +786,6 @@
 				OTHER_LDFLAGS = "";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = GoIO_DLL;
-				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.6.sdk";
 				SECTORDER_FLAGS = "";
 				VERSIONING_SYSTEM = "apple-generic";
 				WARNING_CFLAGS = (
@@ -822,7 +817,6 @@
 				OTHER_LDFLAGS = "";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = GoIO_DLL;
-				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.6.sdk";
 				SECTORDER_FLAGS = "";
 				VERSIONING_SYSTEM = "apple-generic";
 				WARNING_CFLAGS = (
@@ -852,7 +846,6 @@
 				OTHER_LDFLAGS = "";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = GoIO_DLL;
-				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.6.sdk";
 				SECTORDER_FLAGS = "";
 				VERSIONING_SYSTEM = "apple-generic";
 				WARNING_CFLAGS = (
@@ -1032,132 +1025,6 @@
 			};
 			name = Default;
 		};
-		DC93D5BC1247C28E000324EF /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = "$(ONLY_ACTIVE_ARCH_PRE_XCODE_3_1)";
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
-				GCC_PREFIX_HEADER = GoIO_SDK_Prefix.pch;
-				MACOSX_DEPLOYMENT_TARGET = 10.4;
-				ONLY_ACTIVE_ARCH_PRE_XCODE_3_1 = "$(NATIVE_ARCH_ACTUAL)";
-				PREBINDING = YES;
-			};
-			name = Debug;
-		};
-		DC93D5BD1247C28E000324EF /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = (
-					x86_64,
-					i386,
-					ppc,
-				);
-				COPY_PHASE_STRIP = YES;
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 2.11;
-				EXPORTED_SYMBOLS_FILE = exported_symbols;
-				FRAMEWORK_SEARCH_PATHS = "";
-				GCC_ENABLE_FIX_AND_CONTINUE = NO;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				INSTALL_PATH = "@executable_path";
-				LIBRARY_STYLE = DYNAMIC;
-				MACH_O_TYPE = mh_dylib;
-				MACOSX_DEPLOYMENT_TARGET = 10.4;
-				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = (
-					"-seg1addr",
-					0x10000000,
-				);
-				OTHER_REZFLAGS = "";
-				PRODUCT_NAME = libGoIO_DLL;
-				SECTORDER_FLAGS = "";
-				WARNING_CFLAGS = (
-					"-Wmost",
-					"-Wno-four-char-constants",
-					"-Wno-unknown-pragmas",
-				);
-				ZERO_LINK = NO;
-			};
-			name = Debug;
-		};
-		DC93D5BE1247C28E000324EF /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = (
-					x86_64,
-					ppc,
-					i386,
-				);
-				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 2.11;
-				EXPORTED_SYMBOLS_FILE = "";
-				FRAMEWORK_SEARCH_PATHS = "";
-				GCC_ENABLE_FIX_AND_CONTINUE = NO;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				INSTALL_PATH = /usr/local/lib;
-				LIBRARY_STYLE = STATIC;
-				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = "";
-				OTHER_REZFLAGS = "";
-				PRODUCT_NAME = GoIO_DLL;
-				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.6.sdk";
-				SECTORDER_FLAGS = "";
-				VERSIONING_SYSTEM = "apple-generic";
-				WARNING_CFLAGS = (
-					"-Wmost",
-					"-Wno-four-char-constants",
-					"-Wno-unknown-pragmas",
-				);
-				ZERO_LINK = NO;
-			};
-			name = Debug;
-		};
-		DC93D5BF1247C28E000324EF /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = (
-					ppc,
-					i386,
-				);
-				COPY_PHASE_STRIP = YES;
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				EXPORTED_SYMBOLS_FILE = exported_symbols;
-				FRAMEWORK_SEARCH_PATHS = "";
-				FRAMEWORK_VERSION = A;
-				GCC_ENABLE_FIX_AND_CONTINUE = NO;
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				INFOPLIST_FILE = "libGoIO_DLL-Info.plist";
-				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = (
-					"-framework",
-					Carbon,
-				);
-				OTHER_REZFLAGS = "";
-				PRODUCT_NAME = libGoIO_DLL;
-				SECTORDER_FLAGS = "";
-				WARNING_CFLAGS = (
-					"-Wmost",
-					"-Wno-four-char-constants",
-					"-Wno-unknown-pragmas",
-				);
-				ZERO_LINK = NO;
-			};
-			name = Debug;
-		};
-		DC93D5C01247C28E000324EF /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				COPY_PHASE_STRIP = YES;
-				GCC_ENABLE_FIX_AND_CONTINUE = NO;
-				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
-				PRODUCT_NAME = Build_All;
-				ZERO_LINK = NO;
-			};
-			name = Debug;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1166,7 +1033,6 @@
 			buildConfigurations = (
 				377F44E609CF0FFE00459310 /* Development */,
 				377F44E709CF0FFE00459310 /* Deployment */,
-				DC93D5BD1247C28E000324EF /* Debug */,
 				377F44E809CF0FFE00459310 /* Default */,
 			);
 			defaultConfigurationIsVisible = 0;
@@ -1177,7 +1043,6 @@
 			buildConfigurations = (
 				377F44EA09CF0FFE00459310 /* Development */,
 				377F44EB09CF0FFE00459310 /* Deployment */,
-				DC93D5BE1247C28E000324EF /* Debug */,
 				377F44EC09CF0FFE00459310 /* Default */,
 			);
 			defaultConfigurationIsVisible = 0;
@@ -1188,7 +1053,6 @@
 			buildConfigurations = (
 				377F44EE09CF0FFE00459310 /* Development */,
 				377F44EF09CF0FFE00459310 /* Deployment */,
-				DC93D5BF1247C28E000324EF /* Debug */,
 				377F44F009CF0FFE00459310 /* Default */,
 			);
 			defaultConfigurationIsVisible = 0;
@@ -1199,7 +1063,6 @@
 			buildConfigurations = (
 				377F44F209CF0FFE00459310 /* Development */,
 				377F44F309CF0FFE00459310 /* Deployment */,
-				DC93D5BC1247C28E000324EF /* Debug */,
 				377F44F409CF0FFE00459310 /* Default */,
 			);
 			defaultConfigurationIsVisible = 0;
@@ -1210,7 +1073,6 @@
 			buildConfigurations = (
 				37823F8C09CF57A5006F5708 /* Development */,
 				37823F8D09CF57A5006F5708 /* Deployment */,
-				DC93D5C01247C28E000324EF /* Debug */,
 				37823F8E09CF57A5006F5708 /* Default */,
 			);
 			defaultConfigurationIsVisible = 0;
