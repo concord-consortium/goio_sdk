@@ -34,7 +34,6 @@ Release/
 *.cache
 *.ilk
 *.log
-*.lib
 *.sbr
 *.sdf
 *.suo
