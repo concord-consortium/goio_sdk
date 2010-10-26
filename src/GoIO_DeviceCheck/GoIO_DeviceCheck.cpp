@@ -1,3 +1,31 @@
+/*********************************************************************************
+
+Copyright (c) 2010, Vernier Software & Technology
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Vernier Software & Technology nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL VERNIER SOFTWARE & TECHNOLOGY BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+**********************************************************************************/
 // GoIO_DeviceCheck.cpp : Defines the entry point for the console application.
 //
 
@@ -8,6 +36,7 @@
 #ifdef TARGET_OS_WIN
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
 #include <windows.h>
+#pragma warning(disable: 4996)
 #endif
 #ifdef TARGET_OS_LINUX
 #include <sys/time.h>
@@ -42,7 +71,7 @@ int main(int argc, char* argv[])
 	gtype_int32 numMeasurements, i;
 	gtype_real64 averageCalbMeasurement;
 
-	printf("GoIO_DeviceCheck version 1.0\n");
+	printf("GoIO_DeviceCheck version 1.1\n");
 	
 	GoIO_Init();
 
@@ -85,15 +114,10 @@ int main(int argc, char* argv[])
 				averageCalbMeasurement = averageCalbMeasurement/numMeasurements;
 
 			GoIO_Sensor_DDSMem_GetCalibrationEquation(hDevice, &equationType);
-			if (equationType != kEquationType_Linear)
-				strcpy(units, "volts");
-			else
-			{
-				gtype_real32 a, b, c;
-				unsigned char activeCalPage = 0;
-				GoIO_Sensor_DDSMem_GetActiveCalPage(hDevice, &activeCalPage);
-				GoIO_Sensor_DDSMem_GetCalPage(hDevice, activeCalPage, &a, &b, &c, units, sizeof(units));
-			}
+			gtype_real32 a, b, c;
+			unsigned char activeCalPage = 0;
+			GoIO_Sensor_DDSMem_GetActiveCalPage(hDevice, &activeCalPage);
+			GoIO_Sensor_DDSMem_GetCalPage(hDevice, activeCalPage, &a, &b, &c, units, sizeof(units));
 			printf("Average measurement = %8.3f %s .\n", averageCalbMeasurement, units);
 
 			GoIO_Sensor_Close(hDevice);

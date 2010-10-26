@@ -1,3 +1,31 @@
+/*********************************************************************************
+
+Copyright (c) 2010, Vernier Software & Technology
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Vernier Software & Technology nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL VERNIER SOFTWARE & TECHNOLOGY BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+**********************************************************************************/
 // GUtils.cpp
 
 #include "stdafx.h"
@@ -19,6 +47,9 @@
 #include "GPlatformDebug.h" // for DEBUG_NEW definition
 #undef THIS_FILE
 static char THIS_FILE[] = __FILE__;
+int SUBSYS_TRACE_THRESH = TRACE_SEVERITY_LOW;
+#else
+int SUBSYS_TRACE_THRESH = TRACE_SEVERITY_HIGH;
 #endif
 
 /*
@@ -126,7 +157,7 @@ StdIDList GUtils::ConvertIDVectorToList(const StdIDVector * pIDVector) // pointe
 char *_strtime(char *pBuffer);
 char *_strtime(char *pBuffer)
 {
-	unsigned long nSeconds;
+	unsigned int nSeconds;
 	GetDateTime(&nSeconds);
 
 	Str255 sDate;
@@ -355,7 +386,7 @@ StdIDVector GUtils::GetPrunedIDVector(StdIDVector *pvIDs)
 // Curve fitting helper functions
 // The following list contains all of the resources used for the curve fitting functions
 // LinearFit:: " An Introduction to Error Analysis", pages 156-157 - correlation is from page 180 of same book
-long GUtils::CalculateLinearFit(SRealPointVector const &vPoints,	// vector of points to fit line to
+int GUtils::CalculateLinearFit(SRealPointVector const &vPoints,	// vector of points to fit line to
 							    real *pfSlope,				// [out] slope of linear fit
 							    real *pfIntercept,			// [out] intercept of linear fit line
 							    real *pfCorrelation,			// [out] correlation of line to data; if NULL don't fill in
@@ -501,7 +532,7 @@ long GUtils::CalculateLinearFit(SRealPointVector const &vPoints,	// vector of po
 	return kResponse_OK;
 }
 
-long GUtils::CalculateLinearFit(realvector const & vX,	// x Values
+int GUtils::CalculateLinearFit(realvector const & vX,	// x Values
 							    realvector const & vY,	// y Values
 							    real *pfSlope,				// [out] slope of linear fit
 							    real *pfIntercept,			// [out] intercept of linear fit line
@@ -577,10 +608,10 @@ bool GUtils::IsMonotonic(realvector const &vReal)
 //#include <DriverServices.h>
 
 
-unsigned long GUtils::TraceClock(void)
+unsigned int GUtils::TraceClock(void)
 {
 	cppsstream ss;
-	unsigned long nClock = (unsigned long)clock();
+	unsigned int nClock = (unsigned int)clock();
 	ss << " clock: " << nClock << kOSNewlineChar;
 	GUtils::Trace(ss.str());
 	return nClock;
@@ -597,7 +628,7 @@ short GUtils::MakeDataChecksum(unsigned char * pBuffer,		// pointer to nSize uns
 	return nSum;
 }
 */
-void GUtils::Trace(void * pointer, gchar * psFile, int nLine)
+void GUtils::Trace(void * pointer, const gchar * psFile, int nLine)
 {
 	cppsstream ss;
 	ss << pointer;
@@ -605,11 +636,18 @@ void GUtils::Trace(void * pointer, gchar * psFile, int nLine)
 	GSTD_LOG(ss.str());
 }
 
-void GUtils::Trace(cppstring msg,
-				   gchar * psFile,
+void GUtils::Trace(int trace_severity, void * pointer, const gchar * psFile, int nLine)
+{
+	if (trace_severity >= SUBSYS_TRACE_THRESH)
+		Trace(pointer, psFile, nLine);
+}
+
+void GUtils::Trace(const cppstring msg,
+				   const gchar * psFile,
 				   int nLine)
 {
 	int nLen = 0;
+	cppsstream ss;
 	if (psFile != NULL)
 	{
 #ifdef _UNICODE
@@ -621,22 +659,37 @@ void GUtils::Trace(cppstring msg,
 	if ((nLen > 0) && 
 		(nLine != -1)	)
 	{ // Only print File and Line if we have something..
-		cppsstream ss;
-		ss << psFile << GSTD_S("(") << nLine << GSTD_S(") : ") << msg << kOSNewlineString;
-		OSTrace(ss.str().c_str());
+		ss << psFile << GSTD_S("(") << nLine << GSTD_S(") : ");
 	}
-	else
-	 	OSTrace(msg.c_str());
+	ss << msg << endl;
+	OSTrace(ss.str().c_str());
 
 	GSTD_LOG(msg);
 }
 
-void GUtils::Trace(gchar * msg,
-				   gchar * psFile,
+void GUtils::Trace(int trace_severity,
+				   const cppstring msg,
+				   const gchar * psFile,
+				   int nLine)
+{
+	if (trace_severity >= SUBSYS_TRACE_THRESH)
+		Trace(msg, psFile, nLine);
+}
+
+void GUtils::Trace(const gchar * msg,
+				   const gchar * psFile,
 				   int nLine)
 {
 	cppstring cppmsg = msg;
 	GUtils::Trace(cppmsg, psFile, nLine);
+}
+void GUtils::Trace(int trace_severity,
+				   const gchar * msg,
+				   const gchar * psFile,
+				   int nLine)
+{
+	if (trace_severity >= SUBSYS_TRACE_THRESH)
+		Trace(msg, psFile, nLine);
 }
 /*
 int GUtils::GetDecimalPlacesUsed(real fValue)
@@ -1055,11 +1108,7 @@ void GUtils::AssertDialog(const gchar * cFile, // Source (cpp) file where assert
 
 bool GUtils::IsLogOpen(void)
 { // RETURN true if the log file is open and can be written to
-#ifdef _GOIO_LOGGING_ENABLED_
-	return true;
-#else
-	return false;
-#endif
+	return true;	//Report the log as open to enable traces that are conditional on 'IsLogOpen'.
 }
 
 /*
@@ -1111,7 +1160,7 @@ void GUtils::WriteToLog(cppstring sText,	// The text to write
 						int nLine,			// line number of calling method
 						cppstring /*sFunction*/)	// Function name of calling	method (supported only on Mac)
 { // Write some passed-in text to the logfile
-	if (GUtils::pLogOStream != NULL)
+	if (GUtils::pLogOStream != NULL)	//Log is not actually supported.
 	{
 		// Strip the pathname from file
 //		cppstring sFile = GTextUtils::StripPath(sPath);

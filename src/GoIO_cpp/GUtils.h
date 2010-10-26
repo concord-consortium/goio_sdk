@@ -1,3 +1,31 @@
+/*********************************************************************************
+
+Copyright (c) 2010, Vernier Software & Technology
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Vernier Software & Technology nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL VERNIER SOFTWARE & TECHNOLOGY BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+**********************************************************************************/
 // GUtils.h
 //
 // GUtils is a collection of static utility methods designed to wrap
@@ -15,7 +43,22 @@
 // numerical utilities.
 
 #define GSTD_ASSERT(x) GUtils::Assert((x),WIDENMACRO(__FILE__),__LINE__)
-#define GSTD_TRACE(x) GUtils::Trace((x),WIDENMACRO(__FILE__),__LINE__)
+
+#define TRACE_SEVERITY_LOWEST 1
+#define TRACE_SEVERITY_LOW 10
+#define TRACE_SEVERITY_MEDIUM 50
+#define TRACE_SEVERITY_HIGH 100
+
+//We are defining the SUBSYS_TRACE_THRESH macro so that we can change the name from the build script.
+//GCC 3.x is prone to name collision, so we may want to override the default name in some situations.
+#ifndef SUBSYS_TRACE_THRESH 
+#define SUBSYS_TRACE_THRESH g_subsystemTraceThreshold
+#endif
+extern int SUBSYS_TRACE_THRESH ;
+
+#define GSTD_TRACE(x) GUtils::Trace(TRACE_SEVERITY_LOW,(x),WIDENMACRO(__FILE__),__LINE__)
+#define GSTD_TRACEX(severity, msgtext) GUtils::Trace(severity,(msgtext),WIDENMACRO(__FILE__),__LINE__)
+
 // macros for converting __FILE__ to wide 
 #define WIDENMACRO(macro) GSTD_S(macro) // widens a macro
 #define WIDEN(x) GTextUtils::ConvertNarrowStringToWide(x)
@@ -38,11 +81,14 @@ public:
 	// Debugging / diagnostic utilities
 	static bool 			Assert(bool bArgument, const gchar * sFile = GSTD_S(""), int nLine = -1); // ASSERTS if argument is false (also returns argument)
 	static void				AssertDialog(const gchar * sFile, int nLine, const cppstring &sStackTrace = GSTD_S("")); // Cross platform error dialog
-	static void 			Trace(cppstring msg, gchar * psFile = NULL, int nLine = -1); // output a string to trace output
-	static void 			Trace(gchar * pMsg, gchar * psFile = NULL, int nLine = -1); // output a null-terminated string to trace output
-	static void 			Trace(void * pointer, gchar * psFile = NULL, int nLine = -1); // output a null-terminated string to trace output
+	static void 			Trace(const cppstring msg, const gchar * psFile = NULL, int nLine = -1); // output a string to trace output
+	static void 			Trace(const gchar * pMsg, const gchar * psFile = NULL, int nLine = -1); // output a null-terminated string to trace output
+	static void 			Trace(void * pointer, const gchar * psFile = NULL, int nLine = -1); // output a null-terminated string to trace output
+	static void 			Trace(int trace_severity, const cppstring msg, const gchar * psFile = NULL, int nLine = -1); // output a string to trace output
+	static void 			Trace(int trace_severity, const gchar * pMsg, const gchar * psFile = NULL, int nLine = -1); // output a null-terminated string to trace output
+	static void 			Trace(int trace_severity, void * pointer, const gchar * psFile = NULL, int nLine = -1); // output a null-terminated string to trace output
 	static void 			OSTrace(const gchar * pMsg); // output a null-terminated string to trace output
-	static unsigned long 	TraceClock(void); // output the result of std::clock() to trace output; returns clock time
+	static unsigned int 	TraceClock(void); // output the result of std::clock() to trace output; returns clock time
 	static void				OSFloatingPointExceptionReset(void);						
 	static void				Beep(void);	// Your basic beep.
 
@@ -56,8 +102,8 @@ public:
 
 	static int				CustomMessageBox(cppstring sTitle, cppstring msg, StringVector * pvButtonTitles, int nDefaultButton = 0); // list of buttons, in order, default button first
 
-	static void Sleep(unsigned long msToSleep) { OSSleep(msToSleep); }
-	static void OSSleep(unsigned long msToSleep);
+	static void Sleep(unsigned int msToSleep) { OSSleep(msToSleep); }
+	static void OSSleep(unsigned int msToSleep);
 	
 	static bool			IsBetween(real range1, real value, real range2);	// RETURN true if value is between the ranges (inclusive)
 
@@ -165,8 +211,8 @@ public:
 	static EKeyboardEvent OSTranslateKeyboardEvent(void *pData);
 
 	// Curve Fitting functions and helper functions.
-	static long			CalculateLinearFit(SRealPointVector const &vPoints, real *pSlope, real *pIintercept, real *pCorrelation = NULL, real *pfStdDevSlope = NULL, real *pfStdDevIntercept = NULL); // RETURN kResponse_OK or IDSX error string ID
-	static long			CalculateLinearFit(realvector const &vX, realvector const &vY, real *pSlope, real *pIintercept, real *pCorrelation = NULL, real *pfStdDevSlope = NULL, real *pfStdDevIntercept = NULL); // RETURN kResponse_OK or IDSX error string ID
+	static int			CalculateLinearFit(SRealPointVector const &vPoints, real *pSlope, real *pIintercept, real *pCorrelation = NULL, real *pfStdDevSlope = NULL, real *pfStdDevIntercept = NULL); // RETURN kResponse_OK or IDSX error string ID
+	static int			CalculateLinearFit(realvector const &vX, realvector const &vY, real *pSlope, real *pIintercept, real *pCorrelation = NULL, real *pfStdDevSlope = NULL, real *pfStdDevIntercept = NULL); // RETURN kResponse_OK or IDSX error string ID
 
 	static bool			IsMonotonic(SRealPointVector const &vPoints);	// RETURN true if x component of points is monotonic (not both increasing and decreasing)
 	static bool			IsMonotonic(realvector const &vReal); // RETURN true if points are monotonic
@@ -237,11 +283,13 @@ private:
 };
 
 #ifdef TARGET_OS_WIN
-#ifdef _DEBUG
-#define OPUS_NEW DEBUG_NEW
+	#ifdef _DEBUG
+		#define OPUS_NEW DEBUG_NEW
+	#else
+		#define OPUS_NEW new
+	#endif
 #else
-#define OPUS_NEW new
-#endif
+	#define OPUS_NEW new
 #endif
 
 // global allocation macro

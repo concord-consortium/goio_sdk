@@ -1,3 +1,31 @@
+/*********************************************************************************
+
+Copyright (c) 2010, Vernier Software & Technology
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Vernier Software & Technology nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL VERNIER SOFTWARE & TECHNOLOGY BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+**********************************************************************************/
 // GoIO_DLL_interface.cpp : Defines the exported methods for the GoIO_DLL .
 //
 
@@ -15,6 +43,7 @@
 #include "GUSBDirectTempDevice.h"
 #include "GMBLSensor.h"
 #include "GUtils.h"
+#include "NonSmartSensorDDSRecs.h"
 #include "GoIO_DLL_interface.h"
 
 #define SKIP_TIMEOUT_MS_READ_FLASH 2000
@@ -26,6 +55,7 @@ GPtrVector openSensorVector;//list of CGoIOSensors
 OSMutex openSensorVectorMutex = NULL;
 OSMutex multipleInstanceDeviceMutex = NULL;
 bool bMultipleInstanceDeviceMutexLocked = false;
+gtype_bool IOTraceEnableFlag = 0;
 
 class CGoIOSensor
 {
@@ -206,7 +236,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_GetDLLVersion(
 	gtype_uint16 *pMinorVersion) //[o]
 {
 	*pMajorVersion = 2;
-	*pMinorVersion = 28;
+	*pMinorVersion = 39;
 	return 0;
 }
 
@@ -227,6 +257,8 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_GetDLLVersion(
 ****************************************************************************************************************************/
 GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Init()
 {
+	InitSensorDefaultDDSRecs();
+
 	#ifdef TARGET_OS_WIN // If this is Windows...
 		if (!hWinSetupApiLibrary)
 			hWinSetupApiLibrary = WinLoadSetupApiLibrary();
@@ -247,7 +279,10 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Init()
 		}
 
 		if ((!openSensorVectorMutex) || (!hWinSetupApiLibrary) || (!hWinHidDLibrary))
+		{
 			GoIO_Uninit();
+			GSTD_TRACEX(TRACE_SEVERITY_HIGH, "GoIO_Init() failed - another GoIO client may be already running.");
+		}
 	#endif
 
 	#if defined (TARGET_OS_MAC) || defined (TARGET_OS_LINUX)
@@ -255,7 +290,10 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Init()
 			openSensorVectorMutex = GThread::OSCreateMutex(GSTD_S("GoIO_DLL_DeviceListMutex"));
 
 		if (!openSensorVectorMutex)
+		{
 			GoIO_Uninit();
+			GSTD_TRACEX(TRACE_SEVERITY_HIGH, "GoIO_Init() failed - another GoIO client may be already running.");
+		}
 	#endif
 
 	return (openSensorVectorMutex != NULL) ? 0 : -1;
@@ -305,6 +343,38 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Uninit()
 	#endif
 
 	return nResult;
+}
+
+/***************************************************************************************************************************
+	Function Name: GoIO_Diags_SetDebugTraceThreshold()
+	
+	Purpose:	GoIO lib generates a variety of debugging messages when it runs. Each message is assigned a severity
+				when it is generated. Only messages that are assigned a priority >= the debug trace threshold are actually
+				sent to the debug output. Call GoIO_Diags_SetDebugTraceThreshold(GOIO_TRACE_SEVERITY_LOWEST) for max
+				debug output.
+				
+				On windows systems, these messages are passed to the OutputDebugString() function.
+				On Mac and Linux systems, these messages are sent to STDOUT and/or STDERR.
+
+	Return:		0 iff successful, else -1.
+
+****************************************************************************************************************************/
+#define GOIO_TRACE_SEVERITY_LOWEST 1
+#define GOIO_TRACE_SEVERITY_LOW 10
+#define GOIO_TRACE_SEVERITY_MEDIUM 50
+#define GOIO_TRACE_SEVERITY_HIGH 100
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Diags_SetDebugTraceThreshold(
+	gtype_int32 threshold)	//[in] Only trace messages marked with a severity >= threshold are actually sent to the debug output.
+{
+	SUBSYS_TRACE_THRESH = threshold;
+	return 0;
+}
+
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Diags_GetDebugTraceThreshold(
+	gtype_int32 *pThreshold)//[out]
+{
+	(*pThreshold) = SUBSYS_TRACE_THRESH;
+	return 0;
 }
 
 /***************************************************************************************************************************
@@ -453,9 +523,9 @@ GOIO_DLL_INTERFACE_DECL GOIO_SENSOR_HANDLE GoIO_Sensor_Open(
 	//First find out if this device is already open.
 	CGoIOSensor *pNewSensor = NULL;
 	GPortRef newPortRef(kPortType_USB, pDeviceName, pDeviceName, vendorId, productId);
-	long nResult = 0;
+	int nResult = 0;
 	GSensorDDSRec DDSRec;
-	long nBytesRead;
+	int nBytesRead;
 
 	bool bFound = OpenSensorVector_FindSensorByName(pDeviceName, vendorId, productId);
 
@@ -475,15 +545,16 @@ GOIO_DLL_INTERFACE_DECL GOIO_SENSOR_HANDLE GoIO_Sensor_Open(
 	if (0 == nResult)
 	{
 		pNewSensor = new CGoIOSensor(&newPortRef);
+		pNewSensor->m_pInterface->SetDiagnosticsFlag(IOTraceEnableFlag != 0);
 		nResult = pNewSensor->m_pInterface->Open(&newPortRef);
 	}
 
 	if (0 == nResult)
     {
         GCyclopsInitParams initParams;
-        long initParamsSize = 0;
+        int initParamsSize = 0;
         void *pInitParams = NULL;
-		long timeoutMs = SKIP_TIMEOUT_MS_DEFAULT;
+		int timeoutMs = SKIP_TIMEOUT_MS_DEFAULT;
 		if (CYCLOPS_DEFAULT_PRODUCT_ID == productId)
 		{
 			memset(&initParams, 0, sizeof(initParams));
@@ -621,8 +692,17 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_Close(
 	else
 	{
 		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
-        if (pGoIOSensor->m_pInterface->AreMeasurementsEnabled())
-            pGoIOSensor->m_pInterface->SendCmd(SKIP_CMD_ID_STOP_MEASUREMENTS, NULL, 0);
+
+		if (0 == (pGoIOSensor->m_pInterface->GetHostIOStatus() & SKIP_HOST_IO_STATUS_TIMED_OUT))
+		{
+			GSkipSetLedStateParams ledParams;		//Set the LED back to orange.
+			ledParams.color = kLEDOrange;
+			ledParams.brightness = kSkipOrangeLedBrightness;
+			pGoIOSensor->m_pInterface->SendCmdAndGetResponse(SKIP_CMD_ID_SET_LED_STATE, &ledParams, sizeof(ledParams), NULL, NULL);
+
+			if (pGoIOSensor->m_pInterface->AreMeasurementsEnabled())
+				pGoIOSensor->m_pInterface->SendCmd(SKIP_CMD_ID_STOP_MEASUREMENTS, NULL, 0);
+		}
 
 		pGoIOSensor->m_pInterface->Close();
 
@@ -813,8 +893,44 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_SendCmdAndGetResponse(
 	else
 	{
 		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
-		GSTD_ASSERT(sizeof(gtype_int32) == sizeof(long));
-		nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(cmd, pParams, nParamBytes, pRespBuf, (long *) pnRespBytes, timeoutMs);
+		GSTD_ASSERT(sizeof(gtype_int32) == sizeof(int));
+		nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(cmd, pParams, nParamBytes, pRespBuf, (int *) pnRespBytes, timeoutMs);
+
+		UnlockSensor(hSensor);
+	}
+
+	return nResult;
+}
+
+/***************************************************************************************************************************
+	Function Name: GoIO_Sensor_GetLastCmdResponseStatus()
+	
+	Purpose:	Get error information for the device. 
+	
+				In principle, any command sent to the device can result in an error. 
+				If GoIO_Sensor_SendCmdAndGetResponse() ever fails and returns a non-zero return code,
+				you can gather additional info about what went wrong by calling GoIO_Sensor_GetLastCmdResponseStatus().
+
+	Return:		0 if successful, else -1.
+
+****************************************************************************************************************************/
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_GetLastCmdResponseStatus(
+	GOIO_SENSOR_HANDLE hSensor,	//[in] handle to open sensor.
+	unsigned char *pLastCmd,	//[out] last cmd sent to the sensor
+	unsigned char *pLastCmdStatus,//[out] status of last command sent to the sensor.
+								  //If command ran successfully and the device reported good status, then this will be be SKIP_STATUS_SUCCESS(aka 0).
+								  //If no response has been reported back from the device, then this will be SKIP_STATUS_ERROR_COMMUNICATION.
+								  //If the device reported a failure, then this will be a cmd specific error, eg SKIP_STATUS_ERROR_...
+	unsigned char *pLastCmdWithErrorRespSentOvertheWire, //[out] last cmd sent that caused the device to report back an error.
+	unsigned char *pLastErrorSentOvertheWire)//[out] last error that came back from the device 'over the wire'.
+{
+	gtype_int32 nResult = 0;
+	if (!OpenSensorVector_FindAndLockSensor(hSensor))
+		nResult = -1;
+	else
+	{
+		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
+		pGoIOSensor->m_pInterface->GetLastCmdResponseStatus(pLastCmd, pLastCmdStatus, pLastCmdWithErrorRespSentOvertheWire, pLastErrorSentOvertheWire);
 
 		UnlockSensor(hSensor);
 	}
@@ -848,7 +964,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_SendCmd(
 	else
 	{
 		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
-		GSTD_ASSERT(sizeof(gtype_int32) == sizeof(long));
+		GSTD_ASSERT(sizeof(gtype_int32) == sizeof(int));
 		nResult = pGoIOSensor->m_pInterface->SendCmd(cmd, pParams, nParamBytes);
 
 		UnlockSensor(hSensor);
@@ -882,9 +998,9 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_GetNextResponse(
 	else
 	{
 		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
-		GSTD_ASSERT(sizeof(gtype_int32) == sizeof(long));
+		GSTD_ASSERT(sizeof(gtype_int32) == sizeof(int));
 		bool errRespFlag = false;
-		nResult = pGoIOSensor->m_pInterface->GetNextResponse(pRespBuf, (long *) pnRespBytes, pCmd, &errRespFlag, nTimeoutMs);
+		nResult = pGoIOSensor->m_pInterface->GetNextResponse(pRespBuf, (int *) pnRespBytes, pCmd, &errRespFlag, nTimeoutMs);
 		if (0 == nResult)
 			(*pErrRespFlag) = errRespFlag ? 1 : 0;
 
@@ -1103,7 +1219,7 @@ GOIO_SENSOR_HANDLE hSensor)	//[in] handle to open sensor.
 				GoIO Measurement Buffer. A separate GoIO Measurement Buffer is maintained for each
 				open sensor. See the description of GoIO_Sensor_GetNumMeasurementsAvailable().
 
-				Even though a raw measurement is reported as a long, it can be stored in a short 
+				Even though a raw measurement is reported as an int32, it can be stored in a short 
 				integer: it ranges in value from -32768 to 32767.
 
 				To convert a raw measurement to a voltage use GoIO_Sensor_ConvertToVoltage().
@@ -1148,7 +1264,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_ReadRawMeasurements(
 				GoIO Measurement Buffer. A separate GoIO Measurement Buffer is maintained for each
 				open sensor. See the description of GoIO_Sensor_GetNumMeasurementsAvailable().
 
-				Even though a raw measurement is reported as a long, it can be stored in a short 
+				Even though a raw measurement is reported as an int32, it can be stored in a short 
 				integer: it ranges in value from -32768 to 32767.
 
 				To convert a raw measurement to a voltage use GoIO_Sensor_ConvertToVoltage().
@@ -1322,30 +1438,39 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_WriteRecord(
 	{
 		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
 
-		//Verify that we are dealing with a smart sensor.
-		//Do not try to write the SensorDDSRecord unless this is a smart sensor because old versions of Go! Link(ver. 1.5426)
-		//will hang if we try to write the SensorDDSRecord when no smart sensor is connected.
-		GSkipGetSensorIdCmdResponsePayload getSensorIdResponsePayload;
-		long nBytesRead = sizeof(GSkipGetSensorIdCmdResponsePayload);
-		nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(SKIP_CMD_ID_GET_SENSOR_ID, NULL, 0, 
-			&getSensorIdResponsePayload, &nBytesRead);
-		if (0 == nResult)
+		if (SKIP_DEFAULT_PRODUCT_ID == pGoIOSensor->m_pInterface->GetProductID())
 		{
-			//Parse out sensor id.
-			int nSensorId;
-			GUtils::OSConvertBytesToInt(getSensorIdResponsePayload.lsbyteLswordSensorId, 
-				getSensorIdResponsePayload.msbyteLswordSensorId, getSensorIdResponsePayload.lsbyteMswordSensorId, 
-				getSensorIdResponsePayload.msbyteMswordSensorId, &nSensorId);
+			//Verify that we are dealing with a smart sensor.
+			//Do not try to write the SensorDDSRecord unless this is a smart sensor because old versions of Go! Link(ver. 1.5426)
+			//will hang if we try to write the SensorDDSRecord when no smart sensor is connected.
+			GSkipGetSensorIdCmdResponsePayload getSensorIdResponsePayload;
+			int nBytesRead = sizeof(GSkipGetSensorIdCmdResponsePayload);
+			nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(SKIP_CMD_ID_GET_SENSOR_ID, NULL, 0, 
+				&getSensorIdResponsePayload, &nBytesRead);
+			if (0 == nResult)
+			{
+				//Parse out sensor id.
+				int nSensorId;
+				GUtils::OSConvertBytesToInt(getSensorIdResponsePayload.lsbyteLswordSensorId, 
+					getSensorIdResponsePayload.msbyteLswordSensorId, getSensorIdResponsePayload.lsbyteMswordSensorId, 
+					getSensorIdResponsePayload.msbyteMswordSensorId, &nSensorId);
 
-			if (nSensorId < 0)
-				nSensorId = 0;
-			else
-			if (nSensorId > 255)
-				nSensorId = 0;
+				if (nSensorId < 0)
+					nSensorId = 0;
+				else
+				if (nSensorId > 255)
+					nSensorId = 0;
 
-			if (nSensorId < kSensorIdNumber_FirstSmartSensor)
-				nResult = -1;
+				if (nSensorId < kSensorIdNumber_FirstSmartSensor)
+					nResult = -1;
+			}
 		}
+		else if (USB_DIRECT_TEMP_DEFAULT_PRODUCT_ID == pGoIOSensor->m_pInterface->GetProductID())
+			nResult = 0;
+		else if (MINI_GC_DEFAULT_PRODUCT_ID == pGoIOSensor->m_pInterface->GetProductID())
+			nResult = 0;
+		else
+			nResult = -1;
 
 		if (0 == nResult)
 		{
@@ -1394,30 +1519,35 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_ReadRecord(
 		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
 		GSensorDDSRec littleEndianRec;
 
-		//Verify that we are dealing with a smart sensor.
-		//Do not try to read the SensorDDSRecord unless this is a smart sensor because old versions of Go! Link(ver. 1.5426)
-		//will hang if we try to read the SensorDDSRecord when no smart sensor is connected.
-		GSkipGetSensorIdCmdResponsePayload getSensorIdResponsePayload;
-		long nBytesRead = sizeof(GSkipGetSensorIdCmdResponsePayload);
-		nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(SKIP_CMD_ID_GET_SENSOR_ID, NULL, 0, 
-			&getSensorIdResponsePayload, &nBytesRead);
-		if (0 == nResult)
+		if (SKIP_DEFAULT_PRODUCT_ID == pGoIOSensor->m_pInterface->GetProductID())
 		{
-			//Parse out sensor id.
-			int nSensorId;
-			GUtils::OSConvertBytesToInt(getSensorIdResponsePayload.lsbyteLswordSensorId, 
-				getSensorIdResponsePayload.msbyteLswordSensorId, getSensorIdResponsePayload.lsbyteMswordSensorId, 
-				getSensorIdResponsePayload.msbyteMswordSensorId, &nSensorId);
+			//Verify that we are dealing with a smart sensor.
+			//Do not try to read the SensorDDSRecord unless this is a smart sensor because old versions of Go! Link(ver. 1.5426)
+			//will hang if we try to read the SensorDDSRecord when no smart sensor is connected.
+			GSkipGetSensorIdCmdResponsePayload getSensorIdResponsePayload;
+			int nBytesRead = sizeof(GSkipGetSensorIdCmdResponsePayload);
+			nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(SKIP_CMD_ID_GET_SENSOR_ID, NULL, 0, 
+				&getSensorIdResponsePayload, &nBytesRead);
+			if (0 == nResult)
+			{
+				//Parse out sensor id.
+				int nSensorId;
+				GUtils::OSConvertBytesToInt(getSensorIdResponsePayload.lsbyteLswordSensorId, 
+					getSensorIdResponsePayload.msbyteLswordSensorId, getSensorIdResponsePayload.lsbyteMswordSensorId, 
+					getSensorIdResponsePayload.msbyteMswordSensorId, &nSensorId);
 
-			if (nSensorId < 0)
-				nSensorId = 0;
-			else
-			if (nSensorId > 255)
-				nSensorId = 0;
+				if (nSensorId < 0)
+					nSensorId = 0;
+				else
+				if (nSensorId > 255)
+					nSensorId = 0;
 
-			if (nSensorId < kSensorIdNumber_FirstSmartSensor)
-				nResult = -1;
+				if (nSensorId < kSensorIdNumber_FirstSmartSensor)
+					nResult = -1;
+			}
 		}
+		else
+			nResult = 0;	//Let the following code catch errors.
 
 		if (0 == nResult)
 		{
@@ -1516,6 +1646,41 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_CalculateChecksum(
 	return nResult;
 }
 
+/***************************************************************************************************************************
+	Function Name: GoIO_Sensor_DDSMem_ClearRecord()
+	
+	Purpose:	Clear the DDS record for the specified sensor. This puts default values in the record's fields.
+				The sensor name fields are set to blank. The sensor id is set to 0, and a single linear calibration is
+				set up with a gain of 1.0 and an offest of 0. The calibration units field is set to "volts".
+				The OperationType is set to imply a probe type of kProbeTypeAnalog5V.
+
+	Return:		0 if hSensor is valid, else -1.
+
+****************************************************************************************************************************/
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_ClearRecord(
+	GOIO_SENSOR_HANDLE hSensor)	//[in] handle to open sensor.
+{
+	gtype_int32 nResult = -1;
+	if (OpenSensorVector_FindAndLockSensor(hSensor))
+	{
+		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
+		GMBLSensor *pSensor = pGoIOSensor->m_pMBLSensor;
+		GSensorDDSRec DDSRec;
+
+		GMBLSensor *pTempSensor = new GMBLSensor();
+		pTempSensor->GetDDSRec(&DDSRec);
+		pSensor->SetDDSRec(DDSRec, false);
+		delete pTempSensor;
+
+		nResult = 0;
+
+		UnlockSensor(hSensor);
+	}
+
+	return nResult;
+}
+
+
 /***************************************************************************************************************************/
 /***************************************************************************************************************************/
 /***************************************************************************************************************************
@@ -1595,7 +1760,9 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_SetSensorNumber(
 		if (!pSkip)
 			nResult = -1;
 		else
+		{
 			pGoIOSensor->m_pMBLSensor->SetID(SensorNumber);//This may cause GetDDSRecPtr()->OperationType to change also!
+		}
 		UnlockSensor(hSensor);
 	}
 
@@ -1639,8 +1806,8 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_GetSensorNumber(
 		{
 			//Send command to the sensor.
 			GSkipGetSensorIdCmdResponsePayload getSensorIdResponsePayload;
-			long nBytesRead = sizeof(GSkipGetSensorIdCmdResponsePayload);
-			long nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(SKIP_CMD_ID_GET_SENSOR_ID, NULL, 0, 
+			int nBytesRead = sizeof(GSkipGetSensorIdCmdResponsePayload);
+			int nResult = pGoIOSensor->m_pInterface->SendCmdAndGetResponse(SKIP_CMD_ID_GET_SENSOR_ID, NULL, 0, 
 				&getSensorIdResponsePayload, &nBytesRead, timeoutMs);
 			if (0 == nResult)
 			{
@@ -1655,8 +1822,9 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_GetSensorNumber(
 				else
 				if (nSensorId > 255)
 					nSensorId = 0;
+				
+				pGoIOSensor->m_pMBLSensor->SetID(nSensorId);
 				*pSensorNumber = (unsigned char) nSensorId;
-				pGoIOSensor->m_pMBLSensor->GetDDSRecPtr()->SensorNumber = *pSensorNumber;
 			}
 		}
 		UnlockSensor(hSensor);
@@ -2505,5 +2673,97 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_GetChecksum(
 		UnlockSensor(hSensor);
 	}
 
+	return nResult;
+}
+
+GOIO_DLL_INTERFACE_DECL void GoIO_Diags_SetIOTraceEnableFlag(
+	gtype_bool flag)
+{
+	IOTraceEnableFlag = flag;
+}
+
+GOIO_DLL_INTERFACE_DECL void GoIO_Diags_GetIOTraceEnableFlag(
+	gtype_bool *pFlag)			//[out] ptr to loc to store IO trace enable flag. Note that IO tracing is enabled by default.
+{
+	*pFlag = IOTraceEnableFlag;
+}
+
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Diags_GetNumInputTraceBytesAvailable(
+	GOIO_SENSOR_HANDLE hSensor)//[in] handle to open device.
+{
+	gtype_int32 nResult = 0;
+	if (!OpenSensorVector_FindAndLockSensor(hSensor))
+		nResult = 0;
+	else
+	{
+		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
+		if (pGoIOSensor->m_pInterface->GetDiagnosticInputBufferPtr())
+		{
+			nResult = pGoIOSensor->m_pInterface->GetDiagnosticInputBufferPtr()->NumBytesAvailable();
+		}
+
+		UnlockSensor(hSensor);
+	}
+	return nResult;
+}
+
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Diags_ReadInputTraceBytes(
+	GOIO_SENSOR_HANDLE hSensor,		//[in] handle to open sensor.
+	unsigned char *pInputTraceBuf,	//[out] ptr to loc to store trace info.
+	gtype_int32 maxCount)			//[in] maximum number of bytes to copy into pInputTraceBuf.
+{
+	gtype_int32 nResult = 0;
+	if (!OpenSensorVector_FindAndLockSensor(hSensor))
+		nResult = 0;
+	else
+	{
+		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
+		if (pGoIOSensor->m_pInterface->GetDiagnosticInputBufferPtr())
+		{
+			nResult = pGoIOSensor->m_pInterface->GetDiagnosticInputBufferPtr()->RetrieveBytes(pInputTraceBuf, maxCount);
+		}
+
+		UnlockSensor(hSensor);
+	}
+	return nResult;
+}
+
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Diags_GetNumOutputTraceBytesAvailable(
+	GOIO_SENSOR_HANDLE hSensor)//[in] handle to open device.
+{
+	gtype_int32 nResult = 0;
+	if (!OpenSensorVector_FindAndLockSensor(hSensor))
+		nResult = 0;
+	else
+	{
+		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
+		if (pGoIOSensor->m_pInterface->GetDiagnosticOutputBufferPtr())
+		{
+			nResult = pGoIOSensor->m_pInterface->GetDiagnosticOutputBufferPtr()->NumBytesAvailable();
+		}
+
+		UnlockSensor(hSensor);
+	}
+	return nResult;
+}
+
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Diags_ReadOutputTraceBytes(
+	GOIO_SENSOR_HANDLE hSensor,		//[in] handle to open sensor.
+	unsigned char *pOutputTraceBuf,	//[out] ptr to loc to store trace info.
+	gtype_int32 maxCount)			//[in] maximum number of bytes to copy into pOutputTraceBuf.
+{
+	gtype_int32 nResult = 0;
+	if (!OpenSensorVector_FindAndLockSensor(hSensor))
+		nResult = 0;
+	else
+	{
+		CGoIOSensor *pGoIOSensor = (CGoIOSensor *) hSensor;
+		if (pGoIOSensor->m_pInterface->GetDiagnosticOutputBufferPtr())
+		{
+			nResult = pGoIOSensor->m_pInterface->GetDiagnosticOutputBufferPtr()->RetrieveBytes(pOutputTraceBuf, maxCount);
+		}
+
+		UnlockSensor(hSensor);
+	}
 	return nResult;
 }

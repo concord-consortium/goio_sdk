@@ -1,3 +1,31 @@
+/*********************************************************************************
+
+Copyright (c) 2010, Vernier Software & Technology
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Vernier Software & Technology nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL VERNIER SOFTWARE & TECHNOLOGY BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+**********************************************************************************/
 // GCyclopsDevice.cpp
 
 #include "stdafx.h"
@@ -32,16 +60,16 @@ GCyclopsDevice::GCyclopsDevice(GPortRef *pPortRef)
 		GUtils::Trace(GSTD_S("Error - GCyclopsDevice constructor, OSInitialize() returned false."));
 }
 
-intVector GCyclopsDevice::ReadRawMeasurements(long desiredCount /*=-1*/) // Optional -- can limit the number that will be returned
+intVector GCyclopsDevice::ReadRawMeasurements(int desiredCount /*=-1*/) // Optional -- can limit the number that will be returned
 {
 	intVector result;
-	long count = desiredCount;
+	int count = desiredCount;
 	GCyclopsMeasurementPacket packets[NUM_PACKETS_IN_RETRIEVAL_BUFFER];
 
 	if (LockDevice(1) && IsOKToUse())
 	{ // Make sure we're the only thread that has acces to this device
-		long nNumMeasurementsInVec = 0;
-		long nNumPacketsJustRead, nNumPacketsToAskFor;
+		int nNumMeasurementsInVec = 0;
+		int nNumPacketsJustRead, nNumPacketsToAskFor;
 		int measurement;
 		if (count < 0)
 			count = MeasurementsAvailable();
@@ -61,7 +89,7 @@ intVector GCyclopsDevice::ReadRawMeasurements(long desiredCount /*=-1*/) // Opti
 				break;
 			else
 			{
-				long nPacket;
+				int nPacket;
 				for (nPacket = 0; nPacket < nNumPacketsJustRead; nPacket++)
 				{
                     GCyclopsMeasurementPacket *pPacket = &packets[nPacket];
@@ -87,18 +115,18 @@ intVector GCyclopsDevice::ReadRawMeasurements(long desiredCount /*=-1*/) // Opti
 	return result;
 }
 
-long GCyclopsDevice::SendCmdAndGetResponse(
+int GCyclopsDevice::SendCmdAndGetResponse(
 	unsigned char cmd,	//[in] command code
 	void *pParams,		//[in] ptr to cmd specific parameter block, may be NULL.
-	long nParamBytes,	//[in] # of bytes in (*pParams).
+	int nParamBytes,	//[in] # of bytes in (*pParams).
 	void *pRespBuf,		//[out] ptr to destination buffer, may be NULL.
-	long *pnRespBytes,  //[in, out] size of of dest buffer on input, size of response on output, may be NULL if pRespBuf is NULL.
-	long nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
+	int *pnRespBytes,  //[in, out] size of of dest buffer on input, size of response on output, may be NULL if pRespBuf is NULL.
+	int nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
 	bool *pExitFlag /* = NULL */)//[in] ptr to flag that another thread can set to force early exit. 
 						//		THIS FLAG MUST BE FALSE FOR THIS ROUTINE TO RUN.
 						//		Ignore this if NULL.
 {
-	long nResult = TBaseClass::SendCmdAndGetResponse(cmd, pParams, nParamBytes, pRespBuf, pnRespBytes, nTimeoutMs, pExitFlag);
+	int nResult = TBaseClass::SendCmdAndGetResponse(cmd, pParams, nParamBytes, pRespBuf, pnRespBytes, nTimeoutMs, pExitFlag);
 
     if (kResponse_OK == nResult)
     {
@@ -123,14 +151,14 @@ long GCyclopsDevice::SendCmdAndGetResponse(
 	return nResult;
 }
 
-long GCyclopsDevice::ReadSensorDDSMemory(
+int GCyclopsDevice::ReadSensorDDSMemory(
     unsigned char *pBuf, 
-    unsigned long ddsAddr, 
-    unsigned long nBytesToRead, 
-	long /* nTimeoutMs */, 
+    unsigned int ddsAddr, 
+    unsigned int nBytesToRead, 
+	int /* nTimeoutMs */, 
     bool * /* pExitFlag = NULL */)
 {
-    long nResult = -1;
+    int nResult = -1;
     if ((0 == ddsAddr) && (sizeof(GSensorDDSRec) == nBytesToRead))
     {
         nResult = 0;

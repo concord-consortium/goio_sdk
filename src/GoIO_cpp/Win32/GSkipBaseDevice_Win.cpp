@@ -1,3 +1,31 @@
+/*********************************************************************************
+
+Copyright (c) 2010, Vernier Software & Technology
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Vernier Software & Technology nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL VERNIER SOFTWARE & TECHNOLOGY BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+**********************************************************************************/
 // GSkipBaseDevice.cpp
 
 #include "stdafx.h"
@@ -52,8 +80,8 @@ struct CWinSkipMgr
 {
 	CWinSkipMgr();
 	~CWinSkipMgr();
-	long Open(const cppstring &filename);
-	long Close();
+	int Open(const cppstring &filename);
+	int Close();
 
 	void AddMeasurementPacket(GSkipPacket *pRec);
 	void AddCmdRespPacket(GSkipPacket *pRec);
@@ -73,6 +101,7 @@ struct CWinSkipMgr
 	unsigned int m_lastMeasurementTimeMs;			//diagnostic
 	unsigned int m_totalMeasurementsCount;			//diagnostic
 	unsigned int m_maxDeltaTimeMs;
+	GSkipBaseDevice *m_pDevice;
 };
 
 CWinSkipPacketCircularBuffer::CWinSkipPacketCircularBuffer(int numRecs)
@@ -213,6 +242,10 @@ DWORD WINAPI InterruptPipeListenCallback(void * pParam)
 
 		if (ReadFile(pSkipMgr->m_hHidDeviceFile, buf, sizeof(buf), &nNumberOfBytesRead, &HIDOverlapped))
 		{
+			if (pSkipMgr->m_pDevice->GetDiagnosticInputBufferPtr())
+				pSkipMgr->m_pDevice->GetDiagnosticInputBufferPtr()->AddBytes(
+					&buf[FIRST_PAYLOAD_BYTE_INDEX_IN_MICROSOFT_HID_PACKET], sizeof(GSkipPacket));
+
 			//Add packet to appropriate queue.
 			if (buf[FIRST_PAYLOAD_BYTE_INDEX_IN_MICROSOFT_HID_PACKET] & SKIP_MASK_INPUT_PACKET_TYPE)
 				pSkipMgr->AddCmdRespPacket((GSkipPacket *) (&buf[FIRST_PAYLOAD_BYTE_INDEX_IN_MICROSOFT_HID_PACKET]));
@@ -242,6 +275,10 @@ DWORD WINAPI InterruptPipeListenCallback(void * pParam)
 						//See if it was successful.
 						if (GetOverlappedResult(pSkipMgr->m_hHidDeviceFile, &HIDOverlapped, &nNumberOfBytesRead, false))
 						{
+							if (pSkipMgr->m_pDevice->GetDiagnosticInputBufferPtr())
+								pSkipMgr->m_pDevice->GetDiagnosticInputBufferPtr()->AddBytes(
+									&buf[FIRST_PAYLOAD_BYTE_INDEX_IN_MICROSOFT_HID_PACKET], sizeof(GSkipPacket));
+
 							//Add packet to appropriate queue.
 							if (buf[FIRST_PAYLOAD_BYTE_INDEX_IN_MICROSOFT_HID_PACKET] & SKIP_MASK_INPUT_PACKET_TYPE)
 								pSkipMgr->AddCmdRespPacket(
@@ -292,6 +329,7 @@ CWinSkipMgr::CWinSkipMgr()
 	m_startMeasurementTimeMs = 0;
 	m_lastMeasurementTimeMs = 0;
 	m_totalMeasurementsCount = 0;
+	m_pDevice = NULL;
 }
 
 CWinSkipMgr::~CWinSkipMgr()
@@ -308,9 +346,9 @@ CWinSkipMgr::~CWinSkipMgr()
 	m_pCmdRespPacketBuffer = NULL;
 }
 
-long CWinSkipMgr::Open(const cppstring &filename)
+int CWinSkipMgr::Open(const cppstring &filename)
 {
-	long nResult = kResponse_OK;
+	int nResult = kResponse_OK;
 	BOOL bStatus ;
 
 	if (INVALID_HANDLE_VALUE != m_hHidDeviceFile)
@@ -388,9 +426,9 @@ long CWinSkipMgr::Open(const cppstring &filename)
 	return nResult;
 }
 
-long CWinSkipMgr::Close()
+int CWinSkipMgr::Close()
 {
-	long nResult = kResponse_OK;
+	int nResult = kResponse_OK;
 
 	if (NULL != m_hPollingThread)
 	{
@@ -521,6 +559,9 @@ bool GSkipBaseDevice::OSInitialize()
 {
 	GSTD_NEW(m_pOSData, (OSPtr), CWinSkipMgr());
 
+	CWinSkipMgr *pSkipMgr = (CWinSkipMgr *) m_pOSData;
+	pSkipMgr->m_pDevice = this;
+
 	return true;
 }
 
@@ -531,9 +572,9 @@ void GSkipBaseDevice::OSDestroy()
 	m_pOSData = NULL;
 }
 
-long GSkipBaseDevice::OSOpen(GPortRef * /*pPortRef*/)
+int GSkipBaseDevice::OSOpen(GPortRef * /*pPortRef*/)
 {
-	long nResult = kResponse_Error;
+	int nResult = kResponse_Error;
 	if (NULL != m_pOSData)
 	{
 		int nAttemptCount = 0;
@@ -577,9 +618,9 @@ long GSkipBaseDevice::OSOpen(GPortRef * /*pPortRef*/)
 	return nResult;
 }
 
-long GSkipBaseDevice::OSClose()
+int GSkipBaseDevice::OSClose()
 {
-	long nResult = kResponse_Error;
+	int nResult = kResponse_Error;
 	if (NULL != m_pOSData)
 	{
 		if (LockDevice(1) && IsOKToUse())
@@ -596,19 +637,19 @@ long GSkipBaseDevice::OSClose()
 	return nResult;
 }
 
-long GSkipBaseDevice::OSReadMeasurementPackets(
+int GSkipBaseDevice::OSReadMeasurementPackets(
 	void * pBuffer, //[out] ptr to destination buffer
-	long * pIONumPackets, //[in, out] number of packets desired on input, number of packets read on output
-	long nBufferSizeInPackets) //[in] size of destination buffer in packets
+	int * pIONumPackets, //[in, out] number of packets desired on input, number of packets read on output
+	int nBufferSizeInPackets) //[in] size of destination buffer in packets
 {
-	long nResult = kResponse_Error;
-	long nPacketsRead = 0;
+	int nResult = kResponse_Error;
+	int nPacketsRead = 0;
 	if (NULL != m_pOSData)
 	{
 		nResult = kResponse_OK;
 		CWinSkipMgr *pSkipMgr = (CWinSkipMgr *) m_pOSData;
 		unsigned char *pBuf = (unsigned char *) pBuffer;
-		long nPacketsDesired = (*pIONumPackets);
+		int nPacketsDesired = (*pIONumPackets);
 		if (nPacketsDesired > nBufferSizeInPackets)
 			nPacketsDesired = nBufferSizeInPackets;
 
@@ -635,19 +676,19 @@ long GSkipBaseDevice::OSReadMeasurementPackets(
 	return nResult;
 }
 
-long GSkipBaseDevice::OSReadCmdRespPackets(
+int GSkipBaseDevice::OSReadCmdRespPackets(
 	void * pBuffer, //[out] ptr to destination buffer
-	long * pIONumPackets, //[in, out] number of packets desired on input, number of packets read on output
-	long nBufferSizeInPackets) //[in] size of destination buffer in packets
+	int * pIONumPackets, //[in, out] number of packets desired on input, number of packets read on output
+	int nBufferSizeInPackets) //[in] size of destination buffer in packets
 {
-	long nResult = kResponse_Error;
-	long nPacketsRead = 0;
+	int nResult = kResponse_Error;
+	int nPacketsRead = 0;
 	if (NULL != m_pOSData)
 	{
 		nResult = kResponse_OK;
 		CWinSkipMgr *pSkipMgr = (CWinSkipMgr *) m_pOSData;
 		unsigned char *pBuf = (unsigned char *) pBuffer;
-		long nPacketsDesired = (*pIONumPackets);
+		int nPacketsDesired = (*pIONumPackets);
 		if (nPacketsDesired > nBufferSizeInPackets)
 			nPacketsDesired = nBufferSizeInPackets;
 
@@ -674,12 +715,12 @@ long GSkipBaseDevice::OSReadCmdRespPackets(
 	return nResult;
 }
 
-long GSkipBaseDevice::OSWriteCmdPackets(
+int GSkipBaseDevice::OSWriteCmdPackets(
 	void * pBuffer, //[in] ptr to source buffer
-	long nNumPackets)//[in] number of GSkipPackets to write
+	int nNumPackets)//[in] number of GSkipPackets to write
 {
-	long nResult = kResponse_Error;
-	long nPacketsWritten = 0;
+	int nResult = kResponse_Error;
+	int nPacketsWritten = 0;
 	DWORD nLastError;
 	if (NULL != m_pOSData)
 	{
@@ -740,9 +781,9 @@ long GSkipBaseDevice::OSWriteCmdPackets(
 	return nResult;
 }
 
-long GSkipBaseDevice::OSMeasurementPacketsAvailable(unsigned char *pNumMeasurementsInLastPacket /* = NULL */)
+int GSkipBaseDevice::OSMeasurementPacketsAvailable(unsigned char *pNumMeasurementsInLastPacket /* = NULL */)
 {
-	long nPackets = 0;
+	int nPackets = 0;
 	if (NULL != m_pOSData)
 	{
 		if (LockDevice(1) && IsOKToUse())
@@ -761,9 +802,9 @@ long GSkipBaseDevice::OSMeasurementPacketsAvailable(unsigned char *pNumMeasureme
 	return nPackets;
 }
 
-long GSkipBaseDevice::OSCmdRespPacketsAvailable()
+int GSkipBaseDevice::OSCmdRespPacketsAvailable()
 {
-	long nPackets = 0;
+	int nPackets = 0;
 	if (NULL != m_pOSData)
 	{
 		if (LockDevice(1) && IsOKToUse())
@@ -780,9 +821,9 @@ long GSkipBaseDevice::OSCmdRespPacketsAvailable()
 	return nPackets;
 }
 
-long GSkipBaseDevice::OSClearIO()
+int GSkipBaseDevice::OSClearIO()
 {
-	long nResult = kResponse_OK;
+	int nResult = kResponse_OK;
 	if (NULL != m_pOSData)
 	{
 		if (LockDevice(1) && IsOKToUse())
@@ -803,9 +844,9 @@ long GSkipBaseDevice::OSClearIO()
 	return nResult;
 }
 
-long GSkipBaseDevice::OSClearMeasurementPacketQueue()
+int GSkipBaseDevice::OSClearMeasurementPacketQueue()
 {
-	long nResult = kResponse_OK;
+	int nResult = kResponse_OK;
 	if (NULL != m_pOSData)
 	{
 		if (LockDevice(1) && IsOKToUse())
@@ -825,9 +866,9 @@ long GSkipBaseDevice::OSClearMeasurementPacketQueue()
 	return nResult;
 }
 
-long GSkipBaseDevice::OSClearCmdRespPacketQueue()
+int GSkipBaseDevice::OSClearCmdRespPacketQueue()
 {
-	long nResult = kResponse_OK;
+	int nResult = kResponse_OK;
 	if (NULL != m_pOSData)
 	{
 		if (LockDevice(1) && IsOKToUse())

@@ -1,3 +1,31 @@
+/*********************************************************************************
+
+Copyright (c) 2010, Vernier Software & Technology
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Vernier Software & Technology nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL VERNIER SOFTWARE & TECHNOLOGY BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+**********************************************************************************/
 // GUtils_Mac.cpp
 
 #include "GUtils.h"
@@ -33,8 +61,6 @@ bool GUtils::Assert(bool bArgument, const char * sFile, int nLine)
 {
 	if(!bArgument)
 	{
-		::SysBeep(1);
-		
 		char pBuffer[256];
 		printf("%s\n", local_makeAssertString(sFile, nLine, pBuffer));
 	}
@@ -51,8 +77,6 @@ void GUtils::OSAssertDialog(SAppError * pAppError)
 
 void GUtils::Beep(void)
 {
-	// Your basic beep.
-	SysBeep(1);
 }
 
 void GUtils::MessageBox(const cppstring &msg)
@@ -86,7 +110,7 @@ int GUtils::CustomMessageBox(cppstring /*sTitle*/, cppstring msg, StringVector *
 
 void GUtils::OSTrace(const char *pText)
 {
-	printf("%s\n", pText);
+	printf(pText);
 /* #ifndef OPUS_DDK
 	::GetMacApp()->Trace(pText);
 #else
@@ -159,7 +183,7 @@ bool GUtils::OSConvertShortToBytes(short nInNum, unsigned char * pLSB, unsigned 
 {
 	if(!pLSB || !pMSB)
 		return false;
-#if TARGET_CPU_X86
+#if TARGET_RT_LITTLE_ENDIAN
 	unsigned char * pNum = (unsigned char *) &nInNum;
 	*pLSB = *pNum;
 	pNum++;
@@ -178,7 +202,7 @@ bool GUtils::OSConvertBytesToShort(char chLSB, char chMSB, short * pOutShort)
 	if(!pOutShort)
 		return false;
 		
-#if TARGET_CPU_X86
+#if TARGET_RT_LITTLE_ENDIAN
 	char * pAssign = (char *) pOutShort;
 	*pAssign = chLSB;
 	pAssign++;
@@ -206,7 +230,7 @@ bool GUtils::OSConvertIntToBytes(int nInNum,
 	// If this assert ever hits, this routine should be revised - pack
 	// additional high-sig bytes with zeros
 	
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	unsigned char * pNum = (unsigned char *) &nInNum;
 	*pLSB = *pNum;
 	pNum++;
@@ -243,7 +267,7 @@ bool GUtils::OSConvertBytesToInt(unsigned char chLSB,
 	// If this assert ever hits, this routine should be revised - pack
 	// additional high-sig bytes with zeros
 
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	char * pAssign = (char *) pOutInt;
 	*pAssign = chLSB;
 	pAssign++;
@@ -278,7 +302,7 @@ bool GUtils::OSConvertFloatToBytes(float fInNum,
 	if(!GSTD_ASSERT(sizeof(float) == 4))
 		return false;
 	
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	unsigned char * pNum = (unsigned char *) &fInNum;
 	*pLSB = *pNum;
 	pNum++;
@@ -314,7 +338,7 @@ bool GUtils::OSConvertBytesToFloat(unsigned char chLSB,
 		
 	// If this assert ever hits, this routine should be revised - pack
 	// additional high-sig bytes with zeros
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	char * pAssign = (char *) pOutFloat;
 	*pAssign = chLSB;
 	pAssign++;
@@ -338,7 +362,7 @@ bool GUtils::OSConvertBytesToFloat(unsigned char chLSB,
 
 int	GUtils::OSConvertIntelIntToPlatformInt(int nSourceInt)
 {
-#if TARGET_CPU_X86
+#if TARGET_RT_LITTLE_ENDIAN
 	return nSourceInt;
 #else
 	int nDestInt;
@@ -355,7 +379,7 @@ int	GUtils::OSConvertIntelIntToPlatformInt(int nSourceInt)
 
 int	GUtils::OSConvertMacIntToPlatformInt(int nSourceInt)
 {
-#if TARGET_CPU_X86	
+#if TARGET_RT_LITTLE_ENDIAN	
 	int nDestInt;
 	char *pSourceInt = (char *) &nSourceInt;
 	char *pDestInt = (char *) &nDestInt;
@@ -403,13 +427,13 @@ void GUtils::OSSetDefaultFolder(const GFileRef &)
 
 bool GUtils::OSIsQuickTimeAvailable(void)
 {
-	long version;
-	OSStatus err;
-	
-	err = ::Gestalt(gestaltQuickTimeVersion, &version);
-	if (err == noErr && version >= 0x03008000)
-		return true;
-	
+//	long version;
+//	OSStatus err;
+//	
+//	err = ::Gestalt(gestaltQuickTimeVersion, &version);
+//	if (err == noErr && version >= 0x03008000)
+//		return true;
+//	
 	return false;
 }
 
@@ -429,7 +453,7 @@ unsigned int GUtils::OSGetTimeStamp()
 	return (unsigned int)fmod(GetCurrentEventTime() * 1000.0, 0x10000000);
 }
 
-void GUtils::OSSleep(unsigned long msToSleep)
+void GUtils::OSSleep(unsigned int msToSleep)
 {
 	AbsoluteTime absTime = ::AddDurationToAbsolute(msToSleep * durationMillisecond, ::UpTime());
 	::MPDelayUntil(&absTime);

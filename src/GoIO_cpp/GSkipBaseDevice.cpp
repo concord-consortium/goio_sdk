@@ -1,3 +1,31 @@
+/*********************************************************************************
+
+Copyright (c) 2010, Vernier Software & Technology
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Vernier Software & Technology nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL VERNIER SOFTWARE & TECHNOLOGY BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+**********************************************************************************/
 // GSkipBaseDevice.cpp
 
 #include "stdafx.h"
@@ -19,6 +47,8 @@ real GSkipBaseDevice::kVoltsOffset_ProbeTypeAnalog10V = 0.0;
 
 #define NUM_PACKETS_IN_RETRIEVAL_BUFFER 25
 
+#define DIAGNOSTIC_IO_BUFFER_SIZE 10000
+
 /*******************************************************************************
  GSkipBaseDevice:
 *******************************************************************************/
@@ -27,6 +57,15 @@ GSkipBaseDevice::GSkipBaseDevice(GPortRef *pPortRef)
 {
 	m_nLatestRawMeasurement = 0;
     m_bIsMeasuring = false;
+	m_hostIOStatus = 0;
+	m_lastCmd = 0;
+	m_lastCmdRespStatus = 0;
+	m_lastCmdWithErrorRespSentOvertheWire = 0;
+	m_lastErrorSentOvertheWire = 0;
+	m_bDiagnosticsEnabled = false;
+	m_diagnosticInputBufferPtr = NULL;
+	m_diagnosticOutputBufferPtr = NULL;
+	m_pTraceQueueAccessMutex = NULL;
 }
 
 GSkipBaseDevice::~GSkipBaseDevice()
@@ -34,43 +73,83 @@ GSkipBaseDevice::~GSkipBaseDevice()
 	if (IsOpen())
 		Close();
 	OSDestroy();
+
+	if (m_diagnosticOutputBufferPtr)
+		delete m_diagnosticOutputBufferPtr;
+	m_diagnosticOutputBufferPtr = NULL;
+
+	if (m_diagnosticInputBufferPtr)
+		delete m_diagnosticInputBufferPtr;
+	m_diagnosticInputBufferPtr = NULL;
+
+	if (m_pTraceQueueAccessMutex)
+		delete m_pTraceQueueAccessMutex;
+	m_pTraceQueueAccessMutex = NULL;
 }
 
-long GSkipBaseDevice::OSBytesAvailable(void)
+int GSkipBaseDevice::Open(GPortRef *pPortRef)
+{
+	if (m_bDiagnosticsEnabled)
+	{
+		if (!m_pTraceQueueAccessMutex)
+			GSTD_NEW(m_pTraceQueueAccessMutex, (GPriorityMutex *), GPriorityMutex(kThreadPriority_TimeCritical, GSTD_S("")));
+
+		if (m_pTraceQueueAccessMutex->m_OSMutex)
+		{
+			if (!m_diagnosticInputBufferPtr)
+			{
+				GSTD_NEW(m_diagnosticInputBufferPtr, (GCircularBuffer *), GCircularBuffer(DIAGNOSTIC_IO_BUFFER_SIZE));
+				m_diagnosticInputBufferPtr->SetQueueAccessMutex(m_pTraceQueueAccessMutex);
+			}
+
+			if (!m_diagnosticOutputBufferPtr)
+			{
+				GSTD_NEW(m_diagnosticOutputBufferPtr, (GCircularBuffer *), GCircularBuffer(DIAGNOSTIC_IO_BUFFER_SIZE));
+				m_diagnosticOutputBufferPtr->SetQueueAccessMutex(m_pTraceQueueAccessMutex);
+			}
+		}
+	}
+
+	int nResult = TBaseClass::Open(pPortRef);
+
+	return nResult;
+}
+
+int GSkipBaseDevice::OSBytesAvailable(void)
 {
 	GSTD_ASSERT(false); //not used!
 	return 0;
 }
 
-long GSkipBaseDevice::OSRead(void * /*pBuffer*/, long * /*pIONumBytes*/, long /*nBufferSize*/)
+int GSkipBaseDevice::OSRead(void * /*pBuffer*/, int * /*pIONumBytes*/, int /*nBufferSize*/)
 {
 	GSTD_ASSERT(false); //not used!
 	return 0;
 }
 
-long GSkipBaseDevice::OSWrite(void * /*pBuffer*/, long * /*pIONumBytes*/)
+int GSkipBaseDevice::OSWrite(void * /*pBuffer*/, int * /*pIONumBytes*/)
 {
 	GSTD_ASSERT(false); //not used!
 	return 0;
 }
 
-long GSkipBaseDevice::MeasurementsAvailable(void)
+int GSkipBaseDevice::MeasurementsAvailable(void)
 {
 	unsigned char nNumMeasurementsInLastPacket;
-	long nNumMeasurements = OSMeasurementPacketsAvailable(&nNumMeasurementsInLastPacket);
+	int nNumMeasurements = OSMeasurementPacketsAvailable(&nNumMeasurementsInLastPacket);
 	return (nNumMeasurements*nNumMeasurementsInLastPacket);
 }
 
-intVector GSkipBaseDevice::ReadRawMeasurements(long desiredCount /*=-1*/) // Optional -- can limit the number that will be returned
+intVector GSkipBaseDevice::ReadRawMeasurements(int desiredCount /*=-1*/) // Optional -- can limit the number that will be returned
 {
 	intVector result;
-	long count = desiredCount;
+	int count = desiredCount;
 	GSkipMeasurementPacket packets[NUM_PACKETS_IN_RETRIEVAL_BUFFER];
 
 	if (LockDevice(1) && IsOKToUse())
 	{ // Make sure we're the only thread that has acces to this device
-		long nNumMeasurementsInVec = 0;
-		long nNumPacketsJustRead, nNumPacketsToAskFor;
+		int nNumMeasurementsInVec = 0;
+		int nNumPacketsJustRead, nNumPacketsToAskFor;
 		int measurement;
 		if (count < 0)
 			count = MeasurementsAvailable();
@@ -90,7 +169,7 @@ intVector GSkipBaseDevice::ReadRawMeasurements(long desiredCount /*=-1*/) // Opt
 				break;
 			else
 			{
-				long nPacket;
+				int nPacket;
 				for (nPacket = 0; nPacket < nNumPacketsJustRead; nPacket++)
 				{
 					unsigned char nMeasInPacket = 0;
@@ -126,7 +205,7 @@ intVector GSkipBaseDevice::ReadRawMeasurements(long desiredCount /*=-1*/) // Opt
 int	GSkipBaseDevice::GetLatestRawMeasurement()
 {
 	intVector vec;
-	long count = MeasurementsAvailable();
+	int count = MeasurementsAvailable();
 
 	while (count > 0)
 	{
@@ -140,12 +219,12 @@ int	GSkipBaseDevice::GetLatestRawMeasurement()
 	return m_nLatestRawMeasurement;
 }
 
-long GSkipBaseDevice::SendCmd(
+int GSkipBaseDevice::SendCmd(
 	unsigned char cmd,	//[in] command code
 	void *pParams,		//[in] ptr to cmd specific parameter block, may be NULL.
-	long nParamBytes)	//[in] # of bytes in (*pParams).
+	int nParamBytes)	//[in] # of bytes in (*pParams).
 {
-	long nResult;
+	int nResult;
 	GSkipOutputPacket packet;
 
 	if (SKIP_CMD_ID_START_MEASUREMENTS == cmd)
@@ -159,6 +238,9 @@ long GSkipBaseDevice::SendCmd(
 		memcpy(packet.params, pParams, nParamBytes);
 
 	nResult = OSWriteCmdPackets(&packet, 1);
+
+	if (GetDiagnosticOutputBufferPtr())
+		GetDiagnosticOutputBufferPtr()->AddBytes((unsigned char *) &packet, sizeof(packet));
 
 	if (GUtils::IsLogOpen())
 	{
@@ -177,34 +259,34 @@ long GSkipBaseDevice::SendCmd(
 	if (kResponse_OK != nResult)
 	{
 		cppsstream ss;
-		ss << endl << GSTD_S("Error writing ") << ((unsigned short) cmd) << GSTD_S(" cmd to skip.") << endl;
+		ss << GSTD_S("Error writing ") << hex << ((unsigned short) cmd) << GSTD_S("h cmd to skip.");
 		GSTD_TRACE(ss.str());
 	}
 
 	return nResult;
 }
 
-long GSkipBaseDevice::GetNextResponse(
+int GSkipBaseDevice::GetNextResponse(
 	void *pRespBuf,		//[out] ptr to destination buffer, may be NULL.
-	long *pnRespBytes,  //[in, out] size of of dest buffer on input, size of response on output, may be NULL if pRespBuf is NULL.
+	int *pnRespBytes,  //[in, out] size of of dest buffer on input, size of response on output, may be NULL if pRespBuf is NULL.
 	unsigned char *pCmd,//[out] identifies which command this response is for.
 	bool *pErrRespFlag, //[out] flag indicating that the response contains error info
-	long nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
+	int nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
 	bool *pExitFlag /* = NULL */)//[in] ptr to flag that another thread can set to force early exit. 
 						//		THIS FLAG MUST BE FALSE FOR THIS ROUTINE TO RUN.
 						//		Ignore this if NULL.
 {
-	long nResult = kResponse_OK;
+	int nResult = kResponse_OK;
 	char *pRespCharBuf = static_cast<char *>(pRespBuf);
 	(*pErrRespFlag) = false;
 	GSkipGenericResponsePacket packet;
 	bool bResponseComplete = false;
 	bool bFirstPacketFound = false;
-	long nBufSize = 0;
+	int nBufSize = 0;
 	if (pnRespBytes != NULL)
 		nBufSize = (*pnRespBytes);
-	long nRespSize = 0;
-	long nBytesInPacket, nBytesRemainingInBuffer;
+	int nRespSize = 0;
+	int nBytesInPacket, nBytesRemainingInBuffer;
 	bool *pMyExitFlag;
 	bool myExitFlag = false;
 	if (NULL == pExitFlag)
@@ -224,7 +306,7 @@ long GSkipBaseDevice::GetNextResponse(
 				(kResponse_OK == nResult) &&
 				(OSCmdRespPacketsAvailable() > 0))
 		{
-			long transactionPacketCount = 1;
+			int transactionPacketCount = 1;
 			nResult = OSReadCmdRespPackets(&packet, &transactionPacketCount, 1);
 			if (kResponse_OK == nResult)
 			{
@@ -252,6 +334,10 @@ long GSkipBaseDevice::GetNextResponse(
 					nRespSize = min(nBytesInPacket, nBufSize);
 					if (pRespCharBuf && (nRespSize > 0))
 						memcpy(pRespCharBuf, packetPayload, nRespSize);
+
+					m_lastCmdRespStatus = *packetPayload;
+					m_lastCmdWithErrorRespSentOvertheWire = m_lastCmd;
+					m_lastErrorSentOvertheWire = m_lastCmdRespStatus;
 				}
 				if ((!bResponseComplete) && (kResponse_OK == nResult))
 				{
@@ -284,23 +370,23 @@ long GSkipBaseDevice::GetNextResponse(
 	return nResult;
 }
 
-long GSkipBaseDevice::GetInitCmdResponse(
+int GSkipBaseDevice::GetInitCmdResponse(
 	void *pRespBuf,		//[out] ptr to destination buffer, may be NULL.
-	long *pnRespBytes,  //[in, out] size of of dest buffer on input, size of response on output, may be NULL if pRespBuf is NULL.
-	long nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
+	int *pnRespBytes,  //[in, out] size of of dest buffer on input, size of response on output, may be NULL if pRespBuf is NULL.
+	int nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
 	bool *pExitFlag /* = NULL */)//[in] ptr to flag that another thread can set to force early exit. 
 						//		THIS FLAG MUST BE FALSE FOR THIS ROUTINE TO RUN.
 						//		Ignore this if NULL.
 {
 	/* This routine keeps looking at response packets until it sees an INIT cmd response, or times out. */
 	/* Skip will respond to an INIT command at almost any time, so this allows us to recover from weird situations. */
-	long nResult = kResponse_OK;
+	int nResult = kResponse_OK;
 	GSkipDefaultResponsePacket packet;
 	bool bResponseComplete = false;
-	long nBufSize = 0;
+	int nBufSize = 0;
 	if (pnRespBytes != NULL)
 		nBufSize = (*pnRespBytes);
-	long nRespSize = 0;
+	int nRespSize = 0;
 	bool *pMyExitFlag;
 	bool myExitFlag = false;
 	if (NULL == pExitFlag)
@@ -319,7 +405,7 @@ long GSkipBaseDevice::GetInitCmdResponse(
 				(kResponse_OK == nResult) &&
 				(OSCmdRespPacketsAvailable() > 0))
 		{
-			long transactionPacketCount = 1;
+			int transactionPacketCount = 1;
 			nResult = OSReadCmdRespPackets(&packet, &transactionPacketCount, 1);
 			if (kResponse_OK == nResult)
 			{
@@ -327,7 +413,7 @@ long GSkipBaseDevice::GetInitCmdResponse(
 				{
 					//We found it..
 					bResponseComplete = true;
-					nRespSize = min((unsigned long)sizeof(packet.errorStatus), (unsigned long)nBufSize);
+					nRespSize = min((unsigned int)sizeof(packet.errorStatus), (unsigned int)nBufSize);
 					if (pRespBuf && (nRespSize > 0))
 						memcpy(pRespBuf, &packet.errorStatus, nRespSize);
 
@@ -335,8 +421,8 @@ long GSkipBaseDevice::GetInitCmdResponse(
 					{
 						nResult = kResponse_Error;
 						cppsstream sss;
-						sss << endl << GSTD_S("SKIP_CMD_ID_INIT failed with response ") << hex ;
-						sss << ((unsigned short) packet.errorStatus) << GSTD_S("h.") << endl;
+						sss << GSTD_S("SKIP_CMD_ID_INIT failed with response ") << hex ;
+						sss << ((unsigned short) packet.errorStatus) << GSTD_S("h.");
 						GSTD_TRACE(sss.str());
 					}
 				}
@@ -356,29 +442,32 @@ long GSkipBaseDevice::GetInitCmdResponse(
 	if (kResponse_Error == nResult)
 	{
 		cppsstream ss;
-		ss << endl << GSTD_S("Error waiting for response to SKIP_CMD_ID_INIT.") << endl;
+		ss << GSTD_S("Error waiting for response to SKIP_CMD_ID_INIT.");
 		GSTD_TRACE(ss.str());
 	}
 
 	return nResult;
 }
 
-long GSkipBaseDevice::SendCmdAndGetResponse(
+int GSkipBaseDevice::SendCmdAndGetResponse(
 	unsigned char cmd,	//[in] command code
 	void *pParams,		//[in] ptr to cmd specific parameter block, may be NULL.
-	long nParamBytes,	//[in] # of bytes in (*pParams).
+	int nParamBytes,	//[in] # of bytes in (*pParams).
 	void *pRespBuf,		//[out] ptr to destination buffer, may be NULL.
-	long *pnRespBytes,  //[in, out] size of of dest buffer on input, size of response on output, may be NULL if pRespBuf is NULL.
-	long nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
+	int *pnRespBytes,  //[in, out] size of of dest buffer on input, size of response on output, may be NULL if pRespBuf is NULL.
+	int nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
 	bool *pExitFlag /* = NULL */)//[in] ptr to flag that another thread can set to force early exit. 
 						//		THIS FLAG MUST BE FALSE FOR THIS ROUTINE TO RUN.
 						//		Ignore this if NULL.
 {
-	long nResult = kResponse_Error;
+	int nResult = kResponse_Error;
 	bool bTimeout = false;
 
+	m_lastCmd = cmd;
+	m_lastCmdRespStatus = 0;
+
 	if (LockDevice(1) && IsOKToUse())
-	{ // Make sure we're the only thread that has acces to this device
+	{ // Make sure we're the only thread that has access to this device
 		nResult = SendCmd(cmd,	pParams, nParamBytes);
 
 		if (kResponse_OK == nResult)
@@ -394,24 +483,29 @@ long GSkipBaseDevice::SendCmdAndGetResponse(
 				if (kResponse_OK != nResult)
 				{
 					bTimeout = true;
-					ss << endl << GSTD_S("Error waiting for response to ") << hex << ((unsigned short) cmd) << GSTD_S("h cmd from Skip. Timeout??") << endl;
+					m_hostIOStatus = m_hostIOStatus | SKIP_HOST_IO_STATUS_TIMED_OUT;
+					ss << GSTD_S("Error waiting for response to ") << hex << ((unsigned short) cmd) << GSTD_S("h cmd from Skip. Timeout??");
 					GSTD_TRACE(ss.str());
+					if (pnRespBytes)
+						(*pnRespBytes) = 0;//Only 'over the wire' errors have response data.
 				}
 				else
 				if (bError)
 				{
-					ss << endl << GSTD_S("Skip reported an error over the wire. cmd sent = ") << hex << ((unsigned short) cmd) << GSTD_S("h. cmd returned = ");
-					ss << ((unsigned short) responseCmd) << "h." << endl;
+					ss << GSTD_S("Skip reported an error over the wire. cmd sent = ") << hex << ((unsigned short) cmd) << GSTD_S("h. Error returned = ");
+					ss << ((unsigned short) m_lastErrorSentOvertheWire) << GSTD_S("h.");
 					GSTD_TRACE(ss.str());
 					nResult = kResponse_Error;
 				}
 				else
 				if (cmd != responseCmd)
 				{
-					ss << endl << GSTD_S("Skip reported cmd response mismatch. cmd sent = ") << hex << ((unsigned short) cmd) << GSTD_S("h. cmd returned = ");
-					ss << ((unsigned short) responseCmd) << GSTD_S("h.") << endl;
+					ss << GSTD_S("Skip reported cmd response mismatch. cmd sent = ") << hex << ((unsigned short) cmd) << GSTD_S("h. cmd returned = ");
+					ss << ((unsigned short) responseCmd) << GSTD_S("h.");
 					GSTD_TRACE(ss.str());
 					nResult = kResponse_Error;
+					if (pnRespBytes)
+						(*pnRespBytes) = 0;//Only 'over the wire' errors have response data.
 				}
 			}
 		}
@@ -450,7 +544,7 @@ long GSkipBaseDevice::SendCmdAndGetResponse(
 			case SKIP_CMD_ID_READ_REMOTE_NV_MEM:
 				{
 					bool bWasMeasuring = m_bIsMeasuring;
-					long status2 = SendCmdAndGetResponse(SKIP_CMD_ID_INIT, NULL, 0, NULL, NULL, SKIP_TIMEOUT_MS_CMD_ID_INIT_WO_BUSY_STATUS);
+					int status2 = SendCmdAndGetResponse(SKIP_CMD_ID_INIT, NULL, 0, NULL, NULL, SKIP_TIMEOUT_MS_CMD_ID_INIT_WO_BUSY_STATUS);
 					if ((kResponse_OK == status2) && bWasMeasuring)
 					{
 						//SKIP_CMD_ID_INIT turned off measurements - turn them back on.
@@ -464,47 +558,62 @@ long GSkipBaseDevice::SendCmdAndGetResponse(
 		}
 	}
 
+	if ((kResponse_OK != nResult) && (0 == m_lastCmdRespStatus))
+		m_lastCmdRespStatus = SKIP_STATUS_ERROR_COMMUNICATION;
+
 	return nResult;
 }
 
-long GSkipBaseDevice::ReadNonVolatileMemory(
+void GSkipBaseDevice::GetLastCmdResponseStatus(
+	unsigned char *pLastCmd, 
+	unsigned char *pLastCmdStatus,
+	unsigned char *pLastCmdWithErrorRespSentOvertheWire, 
+	unsigned char *pLastErrorSentOvertheWire)
+{
+	*pLastCmd = m_lastCmd;
+	*pLastCmdStatus = m_lastCmdRespStatus;
+	*pLastCmdWithErrorRespSentOvertheWire = m_lastCmdWithErrorRespSentOvertheWire;
+	*pLastErrorSentOvertheWire = m_lastErrorSentOvertheWire;
+}
+
+int GSkipBaseDevice::ReadNonVolatileMemory(
 	bool bLocal,		//[in] Send SKIP_CMD_ID_READ_LOCAL_NV_MEM if true, else send SKIP_CMD_ID_READ_REMOTE_NV_MEM.
 	void *pBuf,			//[out] ptr to destination buffer.
-	unsigned long addr, //[in] addr of the first location in the NV memory to read.
-	unsigned long nBytesToRead,//[in]
-	long nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
+	unsigned int addr, //[in] addr of the first location in the NV memory to read.
+	unsigned int nBytesToRead,//[in]
+	int nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
 	bool *pExitFlag /* = NULL */)//[in] ptr to flag that another thread can set to force early exit. 
 						//		THIS FLAG MUST BE FALSE FOR THIS ROUTINE TO RUN.
 						//		Ignore this if NULL.
 {
-	unsigned long nMaxValidAddr = bLocal ? GetMaxLocalNonVolatileMemAddr() : GetMaxRemoteNonVolatileMemAddr();
+	unsigned int nMaxValidAddr = bLocal ? GetMaxLocalNonVolatileMemAddr() : GetMaxRemoteNonVolatileMemAddr();
 	GSTD_ASSERT((addr + nBytesToRead - 1) <= nMaxValidAddr);
 	GSkipReadI2CMemParams params;
 	params.addr = static_cast<unsigned char>(addr);
 	params.count = static_cast<unsigned char>(nBytesToRead);
-	long nBytesRead = nBytesToRead;
+	int nBytesRead = nBytesToRead;
 
-	long nResult = SendCmdAndGetResponse(bLocal ? SKIP_CMD_ID_READ_LOCAL_NV_MEM : SKIP_CMD_ID_READ_REMOTE_NV_MEM,
+	int nResult = SendCmdAndGetResponse(bLocal ? SKIP_CMD_ID_READ_LOCAL_NV_MEM : SKIP_CMD_ID_READ_REMOTE_NV_MEM,
 		&params, sizeof(params), pBuf, &nBytesRead, nTimeoutMs, pExitFlag);
 
-	if ((kResponse_OK == nResult) && (nBytesRead != (long)nBytesToRead))
+	if ((kResponse_OK == nResult) && (nBytesRead != (int)nBytesToRead))
 		nResult = kResponse_Error;
 
 	return nResult;
 }
 
-long GSkipBaseDevice::WriteNonVolatileMemory(
+int GSkipBaseDevice::WriteNonVolatileMemory(
 	bool bLocal,		//[in] Send SKIP_CMD_ID_WRITE_NV_MEM if true, else send SKIP_CMD_ID_WRITE_REMOTE_NV_MEM
 	void *pBuf,			//[out] ptr to source buffer
-	unsigned long addr, //[in] addr of the first location in the NV memory to write.
-	unsigned long nBytesToWrite,//[in]
-	long nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
+	unsigned int addr, //[in] addr of the first location in the NV memory to write.
+	unsigned int nBytesToWrite,//[in]
+	int nTimeoutMs /* = 1000 */,//[in] # of milliseconds to wait before giving up.
 	bool *pExitFlag /* = NULL */)//[in] ptr to flag that another thread can set to force early exit. 
 						//		THIS FLAG MUST BE FALSE FOR THIS ROUTINE TO RUN.
 						//		Ignore this if NULL.
 {
-	long nResult = kResponse_OK;
-	unsigned long nMaxValidAddr = bLocal ? GetMaxLocalNonVolatileMemAddr() : GetMaxRemoteNonVolatileMemAddr();
+	int nResult = kResponse_OK;
+	unsigned int nMaxValidAddr = bLocal ? GetMaxLocalNonVolatileMemAddr() : GetMaxRemoteNonVolatileMemAddr();
 	GSTD_ASSERT((addr + nBytesToWrite - 1) <= nMaxValidAddr);
 	GSkipWriteI2CMemParams params;
 	char *pSrcBuf = static_cast<char *>(pBuf);
@@ -516,8 +625,8 @@ long GSkipBaseDevice::WriteNonVolatileMemory(
 		pMyExitFlag = pExitFlag;
 	unsigned char baseCmd = bLocal ? SKIP_CMD_ID_WRITE_LOCAL_NV_MEM_1BYTE : SKIP_CMD_ID_WRITE_REMOTE_NV_MEM_1BYTE;
 	unsigned char cmd;
-	unsigned long nBytesWritten = 0;
-	unsigned long nBytesToWriteThisPacket;
+	unsigned int nBytesWritten = 0;
+	unsigned int nBytesToWriteThisPacket;
 
 	unsigned int nStartTime = GUtils::OSGetTimeStamp();
 	unsigned int nCurrentTime = GUtils::OSGetTimeStamp();
@@ -550,7 +659,7 @@ long GSkipBaseDevice::WriteNonVolatileMemory(
 	return nResult;
 }
 
-long GSkipBaseDevice::SetMeasurementPeriod(real fPeriodInSeconds, long nTimeoutMs/* = 1000*/)
+int GSkipBaseDevice::SetMeasurementPeriod(real fPeriodInSeconds, int nTimeoutMs/* = 1000*/)
 {
 	GSTD_ASSERT(fPeriodInSeconds >= 0.0);
 	if (fPeriodInSeconds < GetMinimumMeasurementPeriodInSeconds())
@@ -564,17 +673,17 @@ long GSkipBaseDevice::SetMeasurementPeriod(real fPeriodInSeconds, long nTimeoutM
 	GUtils::OSConvertIntToBytes(nNumTicks, &params.lsbyteLswordMeasurementPeriod, &params.msbyteLswordMeasurementPeriod,
 		&params.lsbyteMswordMeasurementPeriod, &params.msbyteMswordMeasurementPeriod);
 
-	long nResult = SendCmdAndGetResponse(SKIP_CMD_ID_SET_MEASUREMENT_PERIOD, &params, sizeof(params), NULL, NULL, nTimeoutMs);
+	int nResult = SendCmdAndGetResponse(SKIP_CMD_ID_SET_MEASUREMENT_PERIOD, &params, sizeof(params), NULL, NULL, nTimeoutMs);
 
 	return nResult;
 }
 
-real GSkipBaseDevice::GetMeasurementPeriod(long nTimeoutMs/* = 1000*/)
+real GSkipBaseDevice::GetMeasurementPeriod(int nTimeoutMs/* = 1000*/)
 {
 	real fPeriodInSeconds = 1000000.0;
 	GSkipGetMeasurementPeriodCmdResponsePayload payload;
-	long nBytesRead = sizeof(payload);
-	long nResult = SendCmdAndGetResponse(SKIP_CMD_ID_GET_MEASUREMENT_PERIOD, NULL, 0, &payload, &nBytesRead, nTimeoutMs);
+	int nBytesRead = sizeof(payload);
+	int nResult = SendCmdAndGetResponse(SKIP_CMD_ID_GET_MEASUREMENT_PERIOD, NULL, 0, &payload, &nBytesRead, nTimeoutMs);
 	if (kResponse_OK == nResult)
 	{
 		int nNumTicks;
