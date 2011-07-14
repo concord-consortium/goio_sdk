@@ -705,6 +705,7 @@
 					i386,
 				);
 				COPY_PHASE_STRIP = YES;
+				DEAD_CODE_STRIPPING = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 2.11;
 				EXPORTED_SYMBOLS_FILE = exported_symbols;
@@ -722,6 +723,8 @@
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = libGoIO_DLL;
 				SECTORDER_FLAGS = "";
+				STRIP_INSTALLED_PRODUCT = YES;
+				STRIP_STYLE = "non-global";
 				WARNING_CFLAGS = (
 					"-Wmost",
 					"-Wno-four-char-constants",
